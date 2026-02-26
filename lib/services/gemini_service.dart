@@ -1,11 +1,16 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import '../config/keys.dart';
 import '../models/recipe.dart';
 
 class GeminiService {
-  /// Set via: flutter run --dart-define=GROQ_API_KEY=your_key
-  static String get _apiKey => String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
+  /// From --dart-define=GROQ_API_KEY=... or from lib/config/keys.dart
+  static String get _apiKey {
+    final env = String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
+    if (env.isNotEmpty) return env;
+    return groqApiKey;
+  }
   static const _url = 'https://api.groq.com/openai/v1/chat/completions';
   static const _textModel = 'llama-3.3-70b-versatile';
   static const _visionModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
@@ -20,24 +25,33 @@ class GeminiService {
 
   /// Analyzes image and returns 4 real traditional recipes for [cuisine].
   Future<List<Recipe>> analyzeIngredientsFromImage(Uint8List imageBytes, {String? cuisine}) async {
-    // Limit image size for API (Groq suggests max 4MB base64)
+    if (_apiKey.isEmpty) {
+      throw Exception(
+        'Groq API key not set. Add it in lib/config/keys.dart (groqApiKey) or run with: '
+        'flutter run --dart-define=GROQ_API_KEY=your_key',
+      );
+    }
+    // Keep image under ~700KB so base64 stays under 1MB (API limit 4MB)
+    const maxBytes = 700 * 1024;
     Uint8List bytes = imageBytes;
-    if (imageBytes.length > 2 * 1024 * 1024) {
-      bytes = Uint8List.fromList(imageBytes.sublist(0, 2 * 1024 * 1024));
+    if (imageBytes.length > maxBytes) {
+      bytes = Uint8List.fromList(imageBytes.sublist(0, maxBytes));
     }
     final base64Image = base64Encode(bytes);
     final cuisineStr = cuisine ?? 'various cuisines';
-    final prompt = '''You are a professional chef. Look at the image and list the ingredients you see.
-Then create 4 real dishes from $cuisineStr cuisine that use those or similar ingredients.
+    final prompt = '''Look at the food image. List ingredients you see, then suggest 4 real recipes from $cuisineStr cuisine.
 
-Rules: Use real dish names. Each recipe needs: title, description, ingredients (with amounts), steps (stepNumber, instruction, timerSeconds in seconds or null), cookTime, prepTime, servings, difficulty, cuisine, tags array, nutrition (calories, protein, carbs, fat, fiber).
+Return ONLY a JSON array of 4 objects. No other text. Each object:
+{"title":"Dish name","description":"One sentence","ingredients":["100g flour","2 eggs"],"steps":[{"stepNumber":1,"instruction":"Step text","timerSeconds":300}],"cookTime":25,"prepTime":10,"servings":2,"difficulty":"Easy","cuisine":"$cuisineStr","tags":[],"nutrition":{"calories":350,"protein":15,"carbs":40,"fat":12,"fiber":3}}
 
-Return ONLY a valid JSON array of 4 objects. No markdown, no text before or after. Example shape:
-[{"title":"Dish Name","description":"Short description","ingredients":["200g item"],"steps":[{"stepNumber":1,"instruction":"Do this.","timerSeconds":300}],"cookTime":20,"prepTime":10,"servings":2,"difficulty":"Easy","cuisine":"$cuisineStr","tags":[],"nutrition":{"calories":400,"protein":20,"carbs":35,"fat":12,"fiber":5}}]''';
+Use real dish names. Steps: stepNumber (int), instruction (string), timerSeconds (int or null).''';
 
     final response = await http.post(
       Uri.parse(_url),
-      headers: {'Authorization': 'Bearer $_apiKey', 'Content-Type': 'application/json'},
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'Content-Type': 'application/json',
+      },
       body: jsonEncode({
         'model': _visionModel,
         'messages': [
@@ -49,27 +63,59 @@ Return ONLY a valid JSON array of 4 objects. No markdown, no text before or afte
             ],
           },
         ],
-        'max_tokens': 4000,
+        'max_tokens': 4096,
       }),
-    ).timeout(const Duration(seconds: 60));
+    ).timeout(const Duration(seconds: 90));
 
-    if (response.statusCode != 200) {
-      final body = response.body;
-      if (response.statusCode == 429) throw Exception('API quota exceeded. Try again later.');
-      if (response.statusCode >= 500) throw Exception('Server error. Try again later.');
-      throw Exception(body.isNotEmpty ? body : 'API error ${response.statusCode}');
+    final status = response.statusCode;
+    final bodyStr = response.body;
+
+    if (status == 401) {
+      throw Exception(
+        'Invalid Groq API key. Get a key at console.groq.com and set it in lib/config/keys.dart (groqApiKey). Keys usually start with gsk_',
+      );
+    }
+    if (status == 429) throw Exception('API quota exceeded. Try again in a minute.');
+    if (status == 413) throw Exception('Image too large. Try a smaller or lower quality photo.');
+    if (status >= 500) throw Exception('Server error. Try again later.');
+    if (status != 200) {
+      throw Exception(bodyStr.isNotEmpty ? bodyStr : 'API error $status');
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    Map<String, dynamic> body;
+    try {
+      body = jsonDecode(bodyStr) as Map<String, dynamic>;
+    } catch (_) {
+      throw Exception('Invalid API response');
+    }
+
     final choices = body['choices'] as List?;
     if (choices == null || choices.isEmpty) throw Exception('Empty API response');
-    final choice = choices[0] as Map<String, dynamic>?;
-    final message = choice?['message'] as Map<String, dynamic>?;
-    final content = message?['content'];
-    if (content == null) throw Exception('No content in API response');
-    String text = content is String ? content : content.toString();
 
-    // Strip markdown code block if present
+    final first = choices[0];
+    if (first is! Map<String, dynamic>) throw Exception('Unexpected response format');
+    final message = first['message'] as Map<String, dynamic>?;
+    if (message == null) throw Exception('No message in response');
+
+    final content = message['content'];
+    String text;
+    if (content is String) {
+      text = content;
+    } else if (content is List) {
+      final sb = StringBuffer();
+      for (final part in content) {
+        if (part is Map && part['type'] == 'text' && part['text'] != null) {
+          sb.write(part['text']);
+        }
+      }
+      text = sb.toString();
+    } else {
+      throw Exception('No text content in response');
+    }
+
+    if (text.trim().isEmpty) throw Exception('Empty recipe response. Try another photo.');
+
+    // Strip ```json ... ```
     const jsonStart = '```json';
     const jsonEnd = '```';
     if (text.contains(jsonStart)) {
@@ -77,26 +123,27 @@ Return ONLY a valid JSON array of 4 objects. No markdown, no text before or afte
       final end = text.contains(jsonEnd) ? text.indexOf(jsonEnd, start) : text.length;
       text = text.substring(start, end).trim();
     }
-    final s = text.indexOf('[');
-    final e = text.lastIndexOf(']');
-    if (s == -1 || e == -1 || e <= s) throw Exception('No recipe list in response');
+
+    int s = text.indexOf('[');
+    int e = text.lastIndexOf(']');
+    if (s == -1 || e == -1 || e <= s) throw Exception('No recipe list in response. Try another photo.');
     String jsonStr = text.substring(s, e + 1);
-    // Remove trailing commas before ] or } for lenient parse
     jsonStr = jsonStr.replaceAll(RegExp(r',\s*([}\]])'), r'$1');
 
     List<dynamic> list;
     try {
       list = jsonDecode(jsonStr) as List;
     } catch (e) {
-      throw Exception('Invalid JSON from API: $e');
+      throw Exception('Could not parse recipes. Try another photo.');
     }
 
     final recipes = <Recipe>[];
     for (var i = 0; i < list.length; i++) {
       try {
         final item = list[i];
-        if (item is! Map<String, dynamic>) continue;
+        if (item is! Map) continue;
         final map = Map<String, dynamic>.from(item);
+        _normalizeRecipeMap(map);
         map['id'] = '${DateTime.now().millisecondsSinceEpoch}_$i';
         map['createdAt'] = DateTime.now().toIso8601String();
         recipes.add(Recipe.fromJson(map));
@@ -104,6 +151,23 @@ Return ONLY a valid JSON array of 4 objects. No markdown, no text before or afte
     }
     if (recipes.isEmpty) throw Exception('Could not parse any recipes. Try another photo.');
     return recipes;
+  }
+
+  void _normalizeRecipeMap(Map<String, dynamic> map) {
+    if (map['ingredients'] is! List) map['ingredients'] = [];
+    map['ingredients'] = (map['ingredients'] as List)
+        .map((e) => e?.toString() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (map['steps'] is! List) map['steps'] = [];
+    final steps = <Map<String, dynamic>>[];
+    for (final s in map['steps'] as List) {
+      if (s is Map) steps.add(Map<String, dynamic>.from(s));
+    }
+    map['steps'] = steps;
+    if (map['nutrition'] is! Map) {
+      map['nutrition'] = {'calories': 400, 'protein': 20, 'carbs': 35, 'fat': 12, 'fiber': 5};
+    }
   }
 
   Future<Recipe> generateRecipeFromText(String ingredients, {String? cuisine, int? maxTime}) async {
@@ -125,14 +189,70 @@ Return ONLY a valid JSON array of 4 objects. No markdown, no text before or afte
   }
 
   Future<String> chat(String message) async {
+    if (_apiKey.isEmpty) {
+      throw Exception(
+        'Groq API key not set. Add it in lib/config/keys.dart (groqApiKey).',
+      );
+    }
     _chatHistory.add({'role': 'user', 'content': message});
-    final response = await http.post(Uri.parse(_url),
-      headers: {'Authorization': 'Bearer $_apiKey', 'Content-Type': 'application/json'},
-      body: jsonEncode({'model': _textModel, 'messages': _chatHistory, 'max_tokens': 500}));
-    if (response.statusCode != 200) throw Exception(response.body);
-    final reply = jsonDecode(response.body)['choices'][0]['message']['content'] as String;
+    final response = await http.post(
+      Uri.parse(_url),
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': _textModel,
+        'messages': _chatHistory,
+        'max_tokens': 600,
+      }),
+    ).timeout(const Duration(seconds: 30));
+
+    final status = response.statusCode;
+    final bodyStr = response.body;
+
+    if (status == 401) {
+      throw Exception('Invalid Groq API key. Check lib/config/keys.dart');
+    }
+    if (status == 429) throw Exception('Too many requests. Wait a minute and try again.');
+    if (status != 200) {
+      throw Exception(bodyStr.isNotEmpty ? bodyStr : 'API error $status');
+    }
+
+    Map<String, dynamic> body;
+    try {
+      body = jsonDecode(bodyStr) as Map<String, dynamic>;
+    } catch (_) {
+      throw Exception('Invalid API response');
+    }
+
+    final choices = body['choices'] as List?;
+    if (choices == null || choices.isEmpty) throw Exception('Empty API response');
+
+    final first = choices[0];
+    if (first is! Map<String, dynamic>) throw Exception('Unexpected response format');
+    final messageMap = first['message'] as Map<String, dynamic>?;
+    if (messageMap == null) throw Exception('No message in response');
+
+    final content = messageMap['content'];
+    String reply;
+    if (content is String) {
+      reply = content;
+    } else if (content is List) {
+      final sb = StringBuffer();
+      for (final part in content) {
+        if (part is Map && part['type'] == 'text' && part['text'] != null) {
+          sb.write(part['text']);
+        }
+      }
+      reply = sb.toString();
+    } else {
+      throw Exception('No text in response');
+    }
+
+    reply = reply.trim();
     _chatHistory.add({'role': 'assistant', 'content': reply});
-    return reply;
+    return reply.isEmpty ? 'No response. Try asking again.' : reply;
   }
 
   Future<Map<String, List<String>>> generateShoppingList(List<Recipe> recipes) async {

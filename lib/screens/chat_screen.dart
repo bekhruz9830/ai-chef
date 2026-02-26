@@ -104,16 +104,18 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// Сообщения об ошибках для чата (не от скана).
   String _getChatErrorMessage(Object e) {
     final msg = e.toString().toLowerCase();
     if (msg.contains('socket') || msg.contains('connection') || msg.contains('network')) {
-      return 'Нет доступа в интернет. Проверьте подключение и попробуйте снова.';
+      return 'No internet. Check connection and try again.';
+    }
+    if (msg.contains('401') || msg.contains('invalid') && msg.contains('key')) {
+      return 'API key error. Check lib/config/keys.dart.';
     }
     if (msg.contains('quota') || msg.contains('429') || msg.contains('exceeded')) {
-      return 'Превышен лимит запросов. Подождите минуту и попробуйте снова.';
+      return 'Too many requests. Wait a minute and try again.';
     }
-    return 'Не удалось отправить сообщение. Попробуйте снова.';
+    return 'Could not send message. Try again.';
   }
 
   void _scrollToBottom() {
