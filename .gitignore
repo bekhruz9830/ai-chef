@@ -1,0 +1,13 @@
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+
+# Build & tools
+ai_chef/.dart_tool/
+ai_chef/build/
+ai_chef/.flutter-plugins
+ai_chef/.flutter-plugins-dependencies
+ai_chef/.pub-cache/
+ai_chef/.pub/

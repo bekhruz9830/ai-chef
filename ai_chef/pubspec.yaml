@@ -1,0 +1,45 @@
+name: ai_chef
+description: AI Chef - Smart Recipe Assistant
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Firebase
+  firebase_core: ^3.0.0
+  firebase_auth: ^5.0.0
+  cloud_firestore: ^5.0.0
+  firebase_storage: ^12.0.0
+  
+  # Image picker
+  image_picker: ^1.0.7
+  
+  # Local storage
+  shared_preferences: ^2.2.2
+
+  # State / providers
+  provider: ^6.1.2
+  
+  # HTTP
+  http: ^1.2.0
+
+  # Connectivity check
+  connectivity_plus: ^6.0.5
+  
+  # Icons
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

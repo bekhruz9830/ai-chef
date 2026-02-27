@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "929752054681",
+    "project_id": "ai-chef-e31c7",
+    "storage_bucket": "ai-chef-e31c7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:929752054681:android:d2a5f854076c46e55b3108",
+        "android_client_info": {
+          "package_name": "com.aichef.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGnKJa7zkLWbYMiemOqSmBaCvFi6gQeV8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
