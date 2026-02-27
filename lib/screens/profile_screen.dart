@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_chef/constants/theme.dart';
 import 'package:ai_chef/services/firebase_service.dart';
-import 'package:ai_chef/screens/login_screen.dart';
+import 'package:ai_chef/screens/onboarding_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -48,9 +49,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: () async {
               final navigator = Navigator.of(context);
+              Navigator.pop(context);
               await FirebaseService.signOut();
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('onboarding_seen', false);
+              if (!navigator.mounted) return;
               navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                MaterialPageRoute(builder: (_) => const OnboardingScreen()),
                 (_) => false,
               );
             },

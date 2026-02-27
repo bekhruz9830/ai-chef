@@ -191,20 +191,27 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Scan Ingredients'),
-        backgroundColor: AppColors.surface,
-        actions: [
-          if (_state != _ScanState.initial)
-            TextButton(
-              onPressed: _reset,
-              child: const Text('New scan'),
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
+    final isRecipesFound = _state == _ScanState.recipesFound;
+    return PopScope(
+      canPop: !isRecipesFound,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (isRecipesFound) setState(() => _state = _ScanState.cuisineSelection);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Scan Ingredients'),
+          backgroundColor: AppColors.surface,
+          actions: [
+            if (_state != _ScanState.initial)
+              TextButton(
+                onPressed: _reset,
+                child: const Text('New scan'),
+              ),
+          ],
+        ),
+        body: SingleChildScrollView(
         child: Column(
           children: [
             if (_state == _ScanState.initial) _buildInitialState(),
@@ -216,6 +223,7 @@ class _ScanScreenState extends State<ScanScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -681,19 +689,26 @@ class _ScanScreenState extends State<ScanScreen> {
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
               ),
-              child: SizedBox(
-                height: 100,
+              child: Image.network(
+                'https://source.unsplash.com/400x300/?${Uri.encodeComponent(recipe.title)},food,dish',
+                fit: BoxFit.cover,
                 width: double.infinity,
-                child: Image.network(
-                  Recipe.getImageUrl(recipe.title),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: Colors.orange.shade100,
-                    child: Center(
-                      child: Text(
-                        Recipe.getCuisineEmoji(recipe.cuisine),
-                        style: const TextStyle(fontSize: 48),
+                height: 200,
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : Container(
+                        height: 200,
+                        color: Colors.orange.shade100,
+                        child: const Center(
+                            child: CircularProgressIndicator(color: Colors.orange)),
                       ),
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: 200,
+                  color: Colors.orange.shade100,
+                  child: Center(
+                    child: Text(
+                      Recipe.getCuisineEmoji(recipe.cuisine),
+                      style: const TextStyle(fontSize: 80),
                     ),
                   ),
                 ),

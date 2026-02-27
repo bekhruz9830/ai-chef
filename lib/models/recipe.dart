@@ -89,7 +89,7 @@ class Recipe {
 
   /// Unsplash image URL for the dish; use in Image.network with errorBuilder fallback.
   static String getImageUrl(String dishName) {
-    return 'https://source.unsplash.com/400x300/?${Uri.encodeComponent(dishName)},food';
+    return 'https://source.unsplash.com/400x300/?${Uri.encodeComponent(dishName)},food,dish';
   }
 
   static String getCuisineEmoji(String cuisine) {

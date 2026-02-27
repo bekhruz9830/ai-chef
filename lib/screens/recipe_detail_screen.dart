@@ -152,15 +152,26 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        background: Image.network(
-          Recipe.getImageUrl(_recipe.title),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
-            color: Colors.orange.shade100,
-            child: Center(
-              child: Text(
-                Recipe.getCuisineEmoji(_recipe.cuisine),
-                style: const TextStyle(fontSize: 80),
+        background: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.network(
+            'https://source.unsplash.com/400x300/?${Uri.encodeComponent(_recipe.title)},food,dish',
+            fit: BoxFit.cover,
+            width: double.infinity,
+            loadingBuilder: (context, child, progress) => progress == null
+                ? child
+                : Container(
+                    color: Colors.orange.shade100,
+                    child: const Center(
+                        child: CircularProgressIndicator(color: Colors.orange)),
+                  ),
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: Colors.orange.shade100,
+              child: Center(
+                child: Text(
+                  Recipe.getCuisineEmoji(_recipe.cuisine),
+                  style: const TextStyle(fontSize: 80),
+                ),
               ),
             ),
           ),
