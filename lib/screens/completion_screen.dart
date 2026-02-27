@@ -187,6 +187,7 @@ class _CompletionScreenState extends State<CompletionScreen>
                         const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: List.generate(5, (i) {
                             final filled = i < _rating;
                             return IconButton(
@@ -196,11 +197,13 @@ class _CompletionScreenState extends State<CompletionScreen>
                               },
                               icon: Icon(
                                 filled ? Icons.star : Icons.star_border,
-                                size: 40,
+                                size: 32,
                                 color: filled
                                     ? const Color(0xFFFFB74D)
                                     : AppColors.textLight,
                               ),
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                             );
                           }),
                         ),
@@ -235,13 +238,6 @@ class _CompletionScreenState extends State<CompletionScreen>
                                 borderRadius: BorderRadius.circular(16),
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          'More languages coming soon 🌍',
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 16),

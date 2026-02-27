@@ -36,13 +36,16 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     _textController.forward();
     await Future.delayed(const Duration(milliseconds: 1800));
     if (!mounted) return;
+    final user = FirebaseAuth.instance.currentUser;
+    // Если пользователь уже залогинен — сразу на Home (пока не нажал Log out или не удалил приложение)
+    if (user != null) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     final seen = prefs.getBool('onboarding_seen') ?? false;
-    final user = FirebaseAuth.instance.currentUser;
     if (!seen) {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));
-    } else if (user != null) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
     } else {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
     }

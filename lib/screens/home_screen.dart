@@ -33,15 +33,27 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() => _favorites = favorites);
   }
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  String _getDisplayName(User? user) {
+    if (user == null) return '';
+    if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
+      return user.displayName!.trim();
+    }
+    final email = user.email;
+    if (email == null || !email.contains('@')) return '';
+    return email.split('@').first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? 'Good morning'
-        : hour < 17
-            ? 'Good afternoon'
-            : 'Good evening';
+    final greeting = _getGreeting();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -77,42 +89,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader(String greeting, User? user) {
+    final name = _getDisplayName(user);
+    final greetingText = name.isEmpty
+        ? '$greeting! 👋'
+        : '$greeting, $name! 👋';
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$greeting! 👋',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                "What shall we cook?",
-                style: AppTextStyles.title,
-              ),
-            ],
-          ),
-          GestureDetector(
-            onTap: () => setState(() => _currentIndex = 4),
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.gradient1, AppColors.gradient2],
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Center(
-                child: Text('👤', style: TextStyle(fontSize: 24)),
-              ),
+          Text(
+            greetingText,
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textSecondary,
             ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "What shall we cook?",
+            style: AppTextStyles.title,
           ),
         ],
       ),
