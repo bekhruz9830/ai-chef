@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:ai_chef/constants/theme.dart';
 import 'package:ai_chef/services/firebase_service.dart';
 import 'package:ai_chef/services/localization_service.dart';
 import 'package:ai_chef/screens/onboarding_screen.dart';
 import 'package:ai_chef/screens/appearance_screen.dart';
+import 'package:ai_chef/screens/info_screen.dart';
+import 'package:ai_chef/screens/notifications_screen.dart';
+import 'package:ai_chef/screens/share_screen.dart';
 
 const _avatarEmojiKey = 'user_avatar_emoji';
 
@@ -114,7 +118,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showEmojiPicker() {
     final loc = Provider.of<LocalizationService>(context, listen: false);
     final sheetHeight = MediaQuery.of(context).size.height * 0.55;
-    final gridHeight = (sheetHeight - 100).clamp(200.0, 400.0);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -126,7 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           children: [
             Container(
               width: 40,
@@ -137,10 +140,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            Text(loc.t('choose_avatar'), style: AppTextStyles.subtitle),
+            Text(
+              loc.t('choose_avatar'),
+              style: AppTextStyles.subtitle.copyWith(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
             const SizedBox(height: 16),
-            SizedBox(
-              height: gridHeight,
+            Expanded(
               child: GridView.builder(
                 shrinkWrap: false,
                 physics: const ClampingScrollPhysics(),
@@ -609,13 +618,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _openRateApp() async {
+    final uri = Uri.parse(
+      'https://play.google.com/store/apps/details?id=com.aichef.app',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Widget _buildSettings(LocalizationService loc) {
     final settings = [
       {'icon': Icons.palette_outlined, 'key': 'appearance', 'subkey': ''},
-      {'icon': Icons.notifications_outlined, 'key': 'notifications', 'subkey': 'Daily cooking reminders'},
-      {'icon': Icons.restaurant_menu_outlined, 'key': 'dietary', 'subkey': 'Set your preferences'},
-      {'icon': Icons.share_outlined, 'key': 'share', 'subkey': 'Tell your friends'},
-      {'icon': Icons.star_outline, 'key': 'rate', 'subkey': 'Support us with a review'},
+      {'icon': Icons.notifications_outlined, 'key': 'notifications', 'subkey': 'notifications_subtitle'},
+      {'icon': Icons.restaurant_menu_outlined, 'key': 'dietary', 'subkey': 'dietary_subtitle'},
+      {'icon': Icons.share_outlined, 'key': 'share', 'subkey': 'share_subtitle'},
+      {'icon': Icons.star_outline, 'key': 'rate', 'subkey': 'rate_subtitle'},
+      {'icon': Icons.info_outline, 'key': 'about_app', 'subkey': ''},
       {'icon': Icons.privacy_tip_outlined, 'key': 'privacy', 'subkey': ''},
       {'icon': Icons.description_outlined, 'key': 'terms', 'subkey': ''},
     ];
@@ -637,9 +656,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final index = entry.key;
           final setting = entry.value;
           final isLast = index == settings.length - 1;
-          final title = loc.t(setting['key'] as String);
-          final sub = setting['subkey'] as String;
-          final isAppearance = setting['key'] == 'appearance';
+          final key = setting['key'] as String;
+          final subkey = setting['subkey'] as String;
+          final title = loc.t(key);
+          final sub = subkey.isEmpty ? '' : loc.t(subkey);
           return Column(
             children: [
               ListTile(
@@ -676,14 +696,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   size: 14,
                   color: Theme.of(context).textTheme.bodyMedium?.color,
                 ),
-                onTap: () {
-                  if (isAppearance) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AppearanceScreen()),
-                    );
-                  }
-                },
+                onTap: () => _onSettingTap(context, key, loc),
               ),
               if (!isLast) Divider(height: 1, indent: 70, color: Theme.of(context).dividerColor),
             ],
@@ -691,6 +704,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }).toList(),
       ),
     );
+  }
+
+  void _onSettingTap(BuildContext context, String key, LocalizationService loc) {
+    switch (key) {
+      case 'appearance':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const AppearanceScreen()));
+        break;
+      case 'notifications':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+        break;
+      case 'dietary':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const InfoScreen(type: InfoType.about)));
+        break;
+      case 'share':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ShareScreen()));
+        break;
+      case 'rate':
+        _openRateApp();
+        break;
+      case 'about_app':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const InfoScreen(type: InfoType.about)));
+        break;
+      case 'privacy':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const InfoScreen(type: InfoType.privacy)));
+        break;
+      case 'terms':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const InfoScreen(type: InfoType.terms)));
+        break;
+    }
   }
 
   Widget _buildLogout(LocalizationService loc) {

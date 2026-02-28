@@ -65,6 +65,10 @@ class LocalizationService extends ChangeNotifier {
       'removed_from_favorites': 'Removed from favorites', 'undo': 'Undo', 'scan_or_chat': 'Scan ingredients or chat with CHEF AI to find recipes.',
       'monday': 'Monday', 'tuesday': 'Tuesday', 'wednesday': 'Wednesday', 'thursday': 'Thursday', 'friday': 'Friday', 'saturday': 'Saturday', 'sunday': 'Sunday',
       'kcal': 'kcal', 'start_timer': 'Start timer', 'generating_meal_plan': 'CHEF AI is planning your week...', 'generate_meal_plan_hint': 'Generate a personalized 7-day meal plan with CHEF AI', 'chat_error_response': 'Sorry, could not get a response.', 'timer_done': 'Timer done!', 'meal_plan_generated': 'Meal plan generated!', 'loading': 'Loading...',
+      'notifications_subtitle': 'Daily cooking reminders', 'notifications_description': 'When enabled, you\'ll receive one daily reminder to open AI Chef and get recipe ideas.', 'share_subtitle': 'Tell your friends', 'rate_subtitle': 'Support us with a review', 'dietary_subtitle': 'Set your preferences',
+      'about_app': 'About App', 'about_title': 'AI Chef', 'about_description': 'AI Chef is your smart cooking assistant. Scan ingredients, get recipes from different cuisines, chat with CHEF AI, plan meals and create shopping lists. Cook with confidence! 👨‍🍳',
+      'privacy_content': 'We respect your privacy. Your data is stored securely. We do not sell your personal information. Recipe and usage data is used only to improve your experience.',
+      'terms_content': 'By using AI Chef you agree to use the app for personal, non-commercial purposes. Recipe content is for inspiration. Always follow food safety guidelines when cooking.',
     },
     'ru': {
       'home': 'Главная', 'scan': 'Сканер', 'chef_ai': 'ШЕФ ИИ', 'saved': 'Сохранено', 'profile': 'Профиль',
@@ -107,6 +111,10 @@ class LocalizationService extends ChangeNotifier {
       'removed_from_favorites': 'Удалено из избранного', 'undo': 'Отмена', 'scan_or_chat': 'Отсканируйте продукты или спросите CHEF AI.',
       'monday': 'Понедельник', 'tuesday': 'Вторник', 'wednesday': 'Среда', 'thursday': 'Четверг', 'friday': 'Пятница', 'saturday': 'Суббота', 'sunday': 'Воскресенье',
       'kcal': 'ккал', 'start_timer': 'Запустить таймер', 'generating_meal_plan': 'CHEF AI планирует вашу неделю...', 'generate_meal_plan_hint': 'Создайте персональный план на 7 дней с CHEF AI', 'chat_error_response': 'Не удалось получить ответ.', 'timer_done': 'Таймер завершён!', 'meal_plan_generated': 'План меню создан!', 'loading': 'Загрузка...',
+      'notifications_subtitle': 'Ежедневные напоминания о готовке', 'notifications_description': 'Включив, вы будете получать одно напоминание в день открыть AI Chef и получить идеи рецептов.', 'share_subtitle': 'Расскажите друзьям', 'rate_subtitle': 'Поддержите нас отзывом', 'dietary_subtitle': 'Настройте предпочтения',
+      'about_app': 'О приложении', 'about_title': 'AI Chef', 'about_description': 'AI Chef — ваш умный помощник по готовке. Сканируйте продукты, получайте рецепты из разных кухонь, общайтесь с CHEF AI, планируйте меню и списки покупок. Готовьте с уверенностью! 👨‍🍳',
+      'privacy_content': 'Мы уважаем вашу конфиденциальность. Данные хранятся безопасно. Мы не продаём персональную информацию. Данные рецептов используются только для улучшения сервиса.',
+      'terms_content': 'Используя AI Chef, вы соглашаетесь применять приложение в личных целях. Рецепты носят рекомендательный характер. Соблюдайте правила безопасности при готовке.',
     },
     'uz': {
       'home': 'Bosh sahifa', 'scan': 'Skaner', 'chef_ai': 'CHEF AI', 'saved': 'Saqlangan', 'profile': 'Profil',
@@ -149,6 +157,10 @@ class LocalizationService extends ChangeNotifier {
       'removed_from_favorites': 'Saqlanganlardan olib tashlandi', 'undo': 'Bekor qilish', 'scan_or_chat': 'Mahsulotlarni skanerlang yoki CHEF AI dan so\'rang.',
       'monday': 'Dushanba', 'tuesday': 'Seshanba', 'wednesday': 'Chorshanba', 'thursday': 'Payshanba', 'friday': 'Juma', 'saturday': 'Shanba', 'sunday': 'Yakshanba',
       'kcal': 'kkal', 'start_timer': 'Taymerni boshlash', 'generating_meal_plan': 'CHEF AI haftangizni rejalashtirmoqda...', 'generate_meal_plan_hint': 'CHEF AI bilan shaxsiy 7 kunlik ovqat rejasini yarating', 'chat_error_response': 'Javob olish mumkin emas.', 'timer_done': 'Taymer tugadi!', 'meal_plan_generated': 'Ovqat rejasi yaratildi!', 'loading': 'Yuklanmoqda...',
+      'notifications_subtitle': 'Kunlik pishirish eslatmalari', 'notifications_description': 'Yoqilganda, kuniga bir marta AI Chef ni ochish va retseptlar olish eslatmasi keladi.', 'share_subtitle': 'Do\'stlaringizga ayting', 'rate_subtitle': 'Sharh bilan qo\'llab-quvvatlang', 'dietary_subtitle': 'Afzalliklaringizni o\'rnating',
+      'about_app': 'Ilova haqida', 'about_title': 'AI Chef', 'about_description': 'AI Chef — aqlli pishirish yordamchingiz. Mahsulotlarni skanerlang, turli oshxonalardan retseptlar oling, CHEF AI bilan suhbatlashing, ovqat rejasi va xarid ro\'yxatini yarating. Ishonch bilan pishiring! 👨‍🍳',
+      'privacy_content': 'Maxfiyligingizni hurmat qilamiz. Ma\'lumotlaringiz xavfsiz saqlanadi. Shaxsiy ma\'lumotlaringizni sotmaymiz. Retsept ma\'lumotlari faqat xizmatni yaxshilash uchun ishlatiladi.',
+      'terms_content': 'AI Chef dan foydalanib, siz ilovani shaxsiy maqsadlarda ishlatishga rozisiz. Retseptlar tavsiya xarakteriga ega. Pishirishda xavfsizlik qoidalariga amal qiling.',
     },
     'es': {
       'home': 'Inicio', 'scan': 'Escanear', 'chef_ai': 'CHEF IA', 'saved': 'Guardado', 'profile': 'Perfil',

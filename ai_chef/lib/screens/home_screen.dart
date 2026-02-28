@@ -9,7 +9,6 @@ import 'package:ai_chef/screens/scan_screen.dart';
 import 'package:ai_chef/screens/chat_screen.dart';
 import 'package:ai_chef/screens/favorites_screen.dart';
 import 'package:ai_chef/screens/meal_plan_screen.dart';
-import 'package:ai_chef/screens/shopping_list_screen.dart';
 import 'package:ai_chef/screens/profile_screen.dart';
 import 'package:ai_chef/screens/recipe_detail_screen.dart';
 
@@ -182,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 child: _buildActionCard(
                   emoji: '💬',
-                  title: 'CHEF AI Chat',
+                  title: loc.t('chat_chef'),
                   subtitle: loc.t('ask_anything'),
                   gradient: [const Color(0xFF667EEA), const Color(0xFF764BA2)],
                   onTap: () => setState(() => _currentIndex = 2),
@@ -191,32 +190,16 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionCard(
-                  emoji: '📅',
-                  title: loc.t('meal_planner'),
-                  subtitle: loc.t('seven_day'),
-                  gradient: [const Color(0xFF11998E), const Color(0xFF38EF7D)],
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const MealPlanScreen())),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildActionCard(
-                  emoji: '🛍',
-                  title: loc.t('shopping_list'),
-                  subtitle: loc.t('auto_generated'),
-                  gradient: [const Color(0xFFF7971E), const Color(0xFFFFD200)],
-                  onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const ShoppingListScreen())),
-                ),
-              ),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: _buildActionCard(
+              emoji: '📅',
+              title: loc.t('meal_planner'),
+              subtitle: loc.t('seven_day'),
+              gradient: [const Color(0xFF11998E), const Color(0xFF38EF7D)],
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const MealPlanScreen())),
+            ),
           ),
         ],
       ),

@@ -5,6 +5,12 @@ Thumbs.db
 *.iml
 
 # Build & tools
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
 ai_chef/.dart_tool/
 ai_chef/build/
 ai_chef/.flutter-plugins

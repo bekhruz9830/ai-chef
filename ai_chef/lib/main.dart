@@ -5,10 +5,12 @@ import 'package:ai_chef/constants/theme.dart';
 import 'package:ai_chef/screens/splash_screen.dart';
 import 'package:ai_chef/services/localization_service.dart';
 import 'package:ai_chef/services/theme_service.dart';
+import 'package:ai_chef/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await NotificationService().init();
   runApp(const AiChefApp());
 }
 
@@ -33,6 +35,7 @@ class _AiChefAppState extends State<AiChefApp> {
       providers: [
         ChangeNotifierProvider.value(value: LocalizationService()),
         ChangeNotifierProvider.value(value: ThemeService()),
+        ChangeNotifierProvider.value(value: NotificationService()),
       ],
       child: Consumer2<ThemeService, LocalizationService>(
         builder: (context, themeService, loc, _) => MaterialApp(
