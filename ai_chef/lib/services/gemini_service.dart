@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/keys.dart';
+import '../data/cuisine_dishes.dart';
 import '../models/recipe.dart';
 
 class GeminiService {
@@ -74,12 +75,30 @@ class GeminiService {
     final base64Image = base64Encode(bytes);
     final cuisineStr = cuisine ?? 'various cuisines';
     final langName = _langNames[_currentLang] ?? 'English';
-    final prompt = 'You are a professional chef. Look at the ingredients in the image. Generate 4 real traditional dishes from $cuisineStr cuisine with DETAILED step-by-step cooking instructions like a professional kitchen tech card.\n'
+
+    // Список РЕАЛЬНЫХ блюд для выбранной кухни — AI может предлагать только из него
+    List<String>? allowedDishNames;
+    if (cuisine != null && cuisine.isNotEmpty) {
+      final cuisineData = getCuisineByName(cuisine);
+      if (cuisineData != null && cuisineData.dishes.isNotEmpty) {
+        allowedDishNames = cuisineData.dishes.map((d) => d.nameEn).toList();
+      }
+    }
+
+    final allowedRule = allowedDishNames != null && allowedDishNames.isNotEmpty
+        ? 'CRITICAL: You MUST suggest ONLY dishes from this exact list (use "title" exactly as in the list): ${allowedDishNames.join(", ")}. Do not invent any other dish name. Pick 4 dishes that best match the ingredients in the image.\n\n'
+        : '';
+
+    final prompt = 'You are a professional chef. Look at the ingredients in the image. Generate 4 REAL traditional dishes from $cuisineStr cuisine. Each dish must be a dish that REALLY exists in that cuisine — no invented combinations, no fusion.\n\n'
+        '$allowedRule'
+        'FORBIDDEN — never do this:\n'
+        '- Do NOT add pasta, fettuccine, spaghetti, or noodles to dishes that do not traditionally contain them. Plov, Shurpa, Manti, Shashlik, Mastava, Solyanka, Borscht, Kebab, Dimlama are NOT pasta dishes. Wrong examples: "Manti with Fettuccine", "Shurpa with Fettuccine", "Shashlik with Spaghetti".\n'
+        '- Do NOT invent dish names. Only real traditional names (e.g. Plov, Manti, Shurpa, Lagman, Samsa, Borscht, Pelmeni — as they are cooked in real cuisine).\n\n'
         'CRITICAL LANGUAGE RULE: Every textual field MUST be written ONLY in $langName: title, description, ingredients, steps, difficulty, cuisine, tags. '
-        'Do not mix languages. Ingredient names must be in $langName too (examples: "400g shrimp", "20g peanut oil" must be translated to $langName, only numbers/units can stay as numbers/units).\n\n'
-        'For each dish provide:\n- Real traditional dish name\n- Exact ingredients with weights in grams\n- Steps: cleaning, cutting, marinating, frying, boiling, simmering - every action in order\n- Each step must say WHAT to do, HOW MUCH, at WHAT temperature, for HOW LONG\n- timerSeconds must be realistic\n\n'
+        'Ingredient names in $langName; numbers/units can stay as is.\n\n'
+        'For each dish provide: real traditional name, exact ingredients with weights in grams, steps with WHAT to do, HOW MUCH, temperature, HOW LONG, timerSeconds realistic.\n\n'
         'Return ONLY valid JSON array, no markdown:\n'
-        '[{"title":"Spaghetti Aglio e Olio","description":"Classic Neapolitan pasta with garlic and olive oil","ingredients":["400g spaghetti","6 cloves garlic","80ml extra virgin olive oil","1 tsp red chili flakes","20g fresh parsley","salt to taste","2L water for boiling"],"steps":[{"stepNumber":1,"instruction":"Fill large pot with 2L water, add 1 tbsp salt. Bring to boil on high heat.","timerSeconds":600},{"stepNumber":2,"instruction":"Peel and thinly slice 6 garlic cloves into thin rounds.","timerSeconds":120},{"stepNumber":3,"instruction":"Add 400g spaghetti to boiling water. Cook 8-9 minutes until al dente, stirring occasionally.","timerSeconds":510},{"stepNumber":4,"instruction":"Heat 80ml olive oil in large pan on low heat. Add sliced garlic and 1 tsp chili flakes. Fry gently 3-4 minutes until garlic is golden, not brown.","timerSeconds":240},{"stepNumber":5,"instruction":"Reserve 100ml pasta water before draining. Drain spaghetti.","timerSeconds":30},{"stepNumber":6,"instruction":"Add drained pasta to garlic oil pan. Add 50ml pasta water. Toss vigorously on medium heat 2 minutes until sauce coats pasta.","timerSeconds":120},{"stepNumber":7,"instruction":"Remove from heat. Add chopped parsley, toss. Serve immediately on warm plates.","timerSeconds":60}],"cookTime":25,"prepTime":10,"servings":2,"difficulty":"Easy","cuisine":"Italian","tags":["pasta","quick","vegetarian"],"nutrition":{"calories":520,"protein":14,"carbs":72,"fat":20,"fiber":4}}]';
+        '[{"title":"Dish name from allowed list or real cuisine","description":"...","ingredients":["..."],"steps":[{"stepNumber":1,"instruction":"...","timerSeconds":0}],"cookTime":25,"prepTime":10,"servings":2,"difficulty":"Easy","cuisine":"...","tags":["..."],"nutrition":{"calories":520,"protein":14,"carbs":72,"fat":20,"fiber":4}}]';
 
     final response = await http.post(
       Uri.parse(_url),
