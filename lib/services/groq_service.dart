@@ -1,553 +1,313 @@
 import 'dart:convert';
-import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/keys.dart';
 import '../models/recipe.dart';
-import '../data/cuisine_dishes.dart';
 
-/// AI service using Groq API (OpenAI-compatible).
-/// Vision: meta-llama/llama-4-scout-17b-16e-instruct (scan ingredients)
-/// Text:   llama-3.3-70b-versatile (recipes, chat)
 class GroqService {
-  static final GroqService _instance = GroqService._internal();
-  factory GroqService() => _instance;
-
   static const _baseUrl = 'https://api.groq.com/openai/v1/chat/completions';
-  static const _visionModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
-  static const _chatModel = 'llama-3.3-70b-versatile';
+  static String get _apiKey => groqApiKey;
 
-  // ════════════════════════════════════════════════════════
-  // GROQ HTTP
-  // ════════════════════════════════════════════════════════
-  Future<Map<String, dynamic>> _request({
-    required String model,
-    required List<Map<String, dynamic>> messages,
-    bool jsonMode = false,
-    int maxTokens = 4096,
-    double temperature = 0.2, // низкая = точность важнее фантазии
-  }) async {
-    final body = <String, dynamic>{
-      'model': model,
-      'messages': messages,
-      'max_tokens': maxTokens,
-      'temperature': temperature,
-    };
-    if (jsonMode) body['response_format'] = {'type': 'json_object'};
+  static const _visionModels = [
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+    'llama-3.2-11b-vision-preview',
+    'llama-3.2-90b-vision-preview',
+  ];
 
-    final resp = await http.post(
-      Uri.parse(_baseUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_apiKey',
-      },
-      body: jsonEncode(body),
-    );
+  // ─── PUBLIC API ───────────────────────────────────────────────────────────
 
-    if (resp.statusCode != 200) {
-      final err =
-          resp.body.isNotEmpty ? jsonDecode(resp.body) : <String, dynamic>{};
-      throw Exception(
-          'Groq API ${resp.statusCode}: ${err['error']?['message'] ?? resp.body}');
-    }
-
-    final data = jsonDecode(resp.body) as Map<String, dynamic>;
-    final choices = data['choices'] as List<dynamic>?;
-    final reply = choices?.isNotEmpty == true
-        ? ((choices!.first as Map)['message']?['content'] as String?)
-        : null;
-
-    if (reply == null || reply.isEmpty) throw Exception('Groq returned empty response.');
-    return {'content': reply};
+  /// Recognizes food ingredients from photo. Use with [FirebaseRecipeService.findByIngredients].
+  Future<List<String>> recognizeIngredients(Uint8List imageBytes) async {
+    final ingredients = await _recognizeIngredients(imageBytes);
+    debugPrint('✅ Recognized ingredients: $ingredients');
+    return ingredients;
   }
 
-  // ════════════════════════════════════════════════════════
-  // ════════════════════════════════════════════════════════
-
-  /// Возвращает URL картинки для конкретного блюда.
-  /// [dishNameEn] — точное английское название: "Uzbek Plov", "Beef Stroganoff"
-
-  Future<String?> getDishImageUrl(String dishNameEn) async {
-    // Попытка 1: точное название + food
-    // Попытка 2: только название
-    // Попытка 3: только первое слово (страна/тип)
-    if (url == null && dishNameEn.contains(' ')) {
-    }
-    return url;
-  }
-
-    try {
-        'q': query,
-        'image_type': 'photo',
-        'category': 'food',   // ТОЛЬКО еда
-        'safesearch': 'true',
-        'min_width': '640',
-        'per_page': '5',
-        'order': 'popular',
-      });
-      final resp = await http.get(uri);
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body);
-        final hits = data['hits'] as List?;
-        if (hits != null && hits.isNotEmpty) {
-          return hits.first['webformatURL'] as String?;
-        }
-      }
-    } catch (e) {
-    }
-    return null;
-  }
-
-  // ════════════════════════════════════════════════════════
-  // ШАГ 1 — SCAN: анализ фото → список ингредиентов
-  // ════════════════════════════════════════════════════════
-  Future<List<String>> scanIngredientsFromImage(Uint8List imageBytes) async {
-    if (imageBytes.length > 4 * 1024 * 1024) {
-      throw Exception('Image too large. Please choose a photo under 4 MB.');
-    }
-
-    final base64Image = base64Encode(imageBytes);
-
-    // Промпт: только ингредиенты, никаких рецептов
-    const prompt = '''
-Look at this image carefully. Identify every food ingredient, vegetable, fruit, meat, spice or product you can see.
-
-Return ONLY a valid JSON array of ingredient names in English.
-Example: ["chicken breast", "red onion", "garlic", "tomato", "olive oil"]
-
-Rules:
-- Use specific culinary names (e.g. "chicken thigh" not "meat")
-- No duplicates
-- No explanations, no markdown, ONLY the JSON array
-''';
-
-    final messages = [
-      {
-        'role': 'user',
-        'content': [
-          {'type': 'text', 'text': prompt},
-          {
-            'type': 'image_url',
-            'image_url': {'url': 'data:image/jpeg;base64,$base64Image'},
-          },
-        ],
-      },
-    ];
-
-    try {
-      final result = await _request(
-        model: _visionModel,
-        messages: messages,
-        maxTokens: 1024,
-        temperature: 0.1, // максимальная точность при распознавании
-      );
-
-      String clean = (result['content'] as String)
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
-
-      final start = clean.indexOf('[');
-      final end = clean.lastIndexOf(']');
-      if (start != -1 && end != -1 && end > start) {
-        clean = clean.substring(start, end + 1);
-      }
-
-      final List<dynamic> list = jsonDecode(clean);
-      return list.map((e) => e.toString()).toList();
-    } catch (e) {
-      debugPrint('scanIngredientsFromImage error: $e');
-      rethrow;
-    }
-  }
-
-  // ════════════════════════════════════════════════════════
-  // ШАГ 2 — DISHES: блюда берём ТОЛЬКО из базы данных
-  // AI не выбирает блюда — только генерирует рецепт для выбранного
-  // ════════════════════════════════════════════════════════
-  Future<List<Recipe>> getDishSuggestions({
-    required List<String> ingredients,
-    required String country,
-    int count = 5,
-  }) async {
-    final cuisine = getCuisineByName(country);
-    if (cuisine == null || cuisine.dishes.isEmpty) {
-      debugPrint('⚠️ No dishes found for $country');
-      return [];
-    }
-
-    // Берём первые count блюд из базы (можно рандомизировать)
-    final dishesToShow = cuisine.dishes.length > count
-        ? (cuisine.dishes..shuffle()).take(count).toList()
-        : cuisine.dishes;
-
-    // Для каждого блюда из базы генерируем рецепт через AI
-    final List<Recipe> recipes = [];
-    await Future.wait(dishesToShow.map((dbDish) async {
-      try {
-        final recipe = await _generateRecipeForDish(
-          dishTitle: dbDish.title,
-          dishNameEn: dbDish.nameEn,
-          country: country,
-          ingredients: ingredients,
-        );
-        if (recipe != null) {
-          // Картинка по точному запросу из базы
-          recipes.add(recipe);
-        }
-      } catch (e) {
-        debugPrint('Error generating recipe for ${dbDish.title}: $e');
-      }
-    }));
-
-    return recipes;
-  }
-
-  /// Генерирует рецепт для конкретного блюда из базы
-  Future<Recipe?> _generateRecipeForDish({
-    required String dishTitle,
-    required String dishNameEn,
-    required String country,
-    required List<String> ingredients,
-  }) async {
-    final ingredientList = ingredients.join(', ');
-
-    final prompt = '''
-Generate the authentic traditional recipe for "$dishTitle" ($dishNameEn) from $country cuisine.
-
-User has these ingredients available: $ingredientList
-
-Return ONLY valid JSON object, no markdown:
-{
-  "title": "$dishTitle",
-  "name_en": "$dishNameEn",
-  "description": "Authentic 2-sentence description of this traditional $country dish",
-  "cuisine": "$country",
-  "prepTime": 20,
-  "cookTime": 45,
-  "servings": 4,
-  "difficulty": "Easy|Medium|Hard",
-  "ingredients": ["exact amount + ingredient name"],
-  "steps": [
-    {"stepNumber": 1, "instruction": "Detailed authentic cooking step", "timerSeconds": 0}
-  ],
-  "nutrition": {"calories": 350, "protein": 25, "carbs": 30, "fat": 12, "fiber": 3},
-  "tags": ["tag1", "tag2"]
-}
-
-Rules:
-- prepTime and cookTime must be plain integers (no "min" text)
-- Minimum 5 cooking steps
-- Use authentic $country cooking technique
-- nutrition values must be plain numbers (no "g" or "kcal" text)
-''';
-
-    try {
-      final result = await _request(
-        model: _chatModel,
-        messages: [
-          {
-            'role': 'system',
-            'content': 'You are a $country cuisine expert chef. Return only authentic traditional recipes as valid JSON.',
-          },
-          {'role': 'user', 'content': prompt},
-        ],
-        jsonMode: true,
-        maxTokens: 2048,
-        temperature: 0.2,
-      );
-
-      final clean = (result['content'] as String)
-          .replaceAll('```json', '').replaceAll('```', '').trim();
-      final json = _safeJsonParse(clean);
-      if (json == null) return null;
-
-      return Recipe.fromJson({
-        ...json,
-        'id': _generateId(),
-        'createdAt': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('_generateRecipeForDish error for $dishTitle: $e');
-      return null;
-    }
-  }
-
-  // ════════════════════════════════════════════════════════
-  // ШАГ 3 — FULL RECIPE: точный рецепт конкретного блюда
-  // ════════════════════════════════════════════════════════
-  Future<Recipe?> getFullRecipe({
-    required String dishTitle,
-    required String dishNameEn,
-    required String country,
-    int servings = 4,
-  }) async {
-    final prompt = '''
-Provide the EXACT authentic traditional recipe for "$dishTitle" ($dishNameEn) from $country cuisine.
-
-This must be the REAL traditional recipe as it is cooked in $country — not a variation.
-
-Return ONLY valid JSON object:
-{
-  "title": "$dishTitle",
-  "name_en": "$dishNameEn",
-  "description": "Authentic 2-3 sentence description",
-  "cuisine": "$country",
-  "prepTime": "X min",
-  "cookTime": "X min",
-  "servings": $servings,
-  "difficulty": "Easy|Medium|Hard",
-  "ingredients": ["exact amount + ingredient name"],
-  "steps": [
-    {
-      "stepNumber": 1,
-      "instruction": "Detailed cooking instruction with technique",
-      "timerSeconds": 300
-    }
-  ],
-  "nutrition": {
-    "calories": "X kcal",
-    "protein": "Xg",
-    "carbs": "Xg",
-    "fat": "Xg",
-    "fiber": "Xg"
-  },
-  "tags": ["tag1", "tag2"]
-}
-
-Rules:
-- Minimum 6 cooking steps
-- Set timerSeconds for any step with waiting/cooking time (0 if no timer needed)
-- Ingredient amounts for $servings servings
-- Only real traditional recipe
-''';
-
-    try {
-      final result = await _request(
-        model: _chatModel,
-        messages: [
-          {
-            'role': 'system',
-            'content':
-                'You are a $country cuisine expert chef. Return only authentic traditional recipes.',
-          },
-          {'role': 'user', 'content': prompt},
-        ],
-        jsonMode: true,
-        maxTokens: 4096,
-        temperature: 0.2,
-      );
-
-      final clean = (result['content'] as String)
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
-
-      final json = _safeJsonParse(clean);
-      if (json == null) return null;
-
-      final recipe = Recipe.fromJson({
-        ...json,
-        'id': _generateId(),
-        'createdAt': DateTime.now().toIso8601String(),
-      });
-
-      // Точная картинка для блюда
-      recipe.imageUrl = await getDishImageUrl('$country $dishNameEn');
-
-      return recipe;
-    } catch (e) {
-      debugPrint('getFullRecipe error: $e');
-      return null;
-    }
-  }
-
-  // ════════════════════════════════════════════════════════
-  // СТАРЫЕ МЕТОДЫ (сохранены для совместимости)
-  // ════════════════════════════════════════════════════════
-
-  /// Старый метод — scan фото → сразу рецепты (без выбора страны).
-  /// Оставлен для обратной совместимости. Лучше использовать
-  /// scanIngredientsFromImage → getDishSuggestions → getFullRecipe
+  /// Legacy: recognize + fetch recipes via API. Prefer [recognizeIngredients] + [FirebaseRecipeService.findByIngredients].
   Future<List<Recipe>> analyzeIngredientsFromImage(Uint8List imageBytes) async {
-    if (imageBytes.length > 4 * 1024 * 1024) {
-      throw Exception('Image too large. Please choose a photo under 4 MB.');
+    final ingredients = await recognizeIngredients(imageBytes);
+    if (ingredients.isEmpty) {
+      throw Exception('No food ingredients detected. Try a clearer photo.');
     }
-    final base64Image = base64Encode(imageBytes);
-    const prompt = '''
-Analyze this image. Identify food ingredients visible.
-Suggest 3 real, authentic recipes using those ingredients.
-Return ONLY a valid JSON array. Each recipe must have:
-"title","description","ingredients"(array),"steps"(array with "stepNumber","instruction","timerSeconds"),
-"cookTime","prepTime","servings","difficulty","cuisine",
-"nutrition"({"calories","protein","carbs","fat","fiber"}).
-No markdown. Only JSON array.
-''';
-    final messages = [
-      {
-        'role': 'user',
-        'content': [
-          {'type': 'text', 'text': prompt},
-          {
-            'type': 'image_url',
-            'image_url': {'url': 'data:image/jpeg;base64,$base64Image'},
-          },
-        ],
-      },
-    ];
-    try {
-      final result = await _request(
-        model: _visionModel,
-        messages: messages,
-        maxTokens: 4096,
-      );
-      String clean = (result['content'] as String)
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
-      final start = clean.indexOf('[');
-      final end = clean.lastIndexOf(']');
-      if (start != -1 && end != -1 && end > start) {
-        clean = clean.substring(start, end + 1);
+    return _fetchRecipes(ingredients);
+  }
+
+  // ─── STEP 1: VISION ──────────────────────────────────────────────────────
+
+  Future<List<String>> _recognizeIngredients(Uint8List imageBytes) async {
+    String? lastError;
+
+    for (final model in _visionModels) {
+      try {
+        final result = await _recognizeWithModel(model, imageBytes);
+        if (result.isNotEmpty) return result;
+      } catch (e) {
+        lastError = e.toString();
+        debugPrint('Vision model $model failed: $e');
       }
-      final List<dynamic> jsonList = jsonDecode(clean);
-      return jsonList
-          .map((json) => Recipe.fromJson({
-                ...(json as Map<String, dynamic>),
-                'id': _generateId(),
-                'createdAt': DateTime.now().toIso8601String(),
-              }))
-          .toList();
-    } catch (e) {
-      debugPrint('analyzeIngredientsFromImage error: $e');
-      rethrow;
     }
+
+    throw Exception('Could not recognize ingredients. $lastError');
   }
 
-  Future<Recipe?> generateRecipeFromText(
-    String ingredients, {
-    String? cuisine,
-    String? occasion,
-    int? maxTime,
-  }) async {
+  Future<List<String>> _recognizeWithModel(
+      String model, Uint8List imageBytes) async {
+    final base64Image = base64Encode(imageBytes);
+
+    final response = await http
+        .post(
+          Uri.parse(_baseUrl),
+          headers: {
+            'Authorization': 'Bearer $_apiKey',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'model': model,
+            'temperature': 0.1,
+            'max_tokens': 400,
+            'messages': [
+              {
+                'role': 'user',
+                'content': [
+                  {
+                    'type': 'image_url',
+                    'image_url': {'url': 'data:image/jpeg;base64,$base64Image'},
+                  },
+                  {
+                    'type': 'text',
+                    'text': '''Look at this image and identify ALL food ingredients visible.
+Be very specific about the TYPE of ingredient:
+- For pasta/noodles: specify exactly what type (e.g. "long thin noodles", "pasta sheets", "rice noodles", "egg noodles", "spaghetti", "lasagna sheets")
+- For meat: specify (e.g. "ground beef", "beef chunks", "chicken breast", "lamb", "pork belly")
+- For vegetables: name each one
+
+Reply ONLY with a JSON array of strings. Example: ["long thin noodles", "ground beef", "onion", "tomato"]
+If no food is visible, return: []''',
+                  },
+                ],
+              },
+            ],
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    debugPrint('Vision [$model] status: ${response.statusCode}');
+
+    if (response.statusCode != 200) {
+      throw Exception('HTTP ${response.statusCode}: ${response.body}');
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final choices = data['choices'] as List?;
+    final first = choices != null && choices.isNotEmpty ? choices.first : null;
+    final content = (first is Map<String, dynamic>)
+        ? (first['message']?['content']?.toString().trim() ?? '')
+        : '';
+
+    debugPrint('Vision response: $content');
+
+    final cleaned = content.replaceAll('```json', '').replaceAll('```', '').trim();
+    final start = cleaned.indexOf('[');
+    final end = cleaned.lastIndexOf(']');
+    if (start == -1 || end == -1) throw Exception('No JSON array: $content');
+
+    final list = jsonDecode(cleaned.substring(start, end + 1)) as List;
+    return list.map((e) => e.toString().toLowerCase().trim()).where((s) => s.isNotEmpty).toList();
+  }
+
+  // ─── STEP 2: RECIPE MATCHING ──────────────────────────────────────────────
+
+  Future<List<Recipe>> _fetchRecipes(List<String> ingredients) async {
     try {
-      final prompt = '''
-Create an authentic recipe using: $ingredients
-${cuisine != null ? 'Cuisine: $cuisine' : ''}
-${occasion != null ? 'Occasion: $occasion' : ''}
-${maxTime != null ? 'Max time: $maxTime minutes' : ''}
-Use a REAL dish name from the specified cuisine. Return ONLY valid JSON, no markdown.
-''';
-      final result = await _request(
-        model: _chatModel,
-        messages: [{'role': 'user', 'content': prompt}],
-        jsonMode: true,
-      );
-      final clean = (result['content'] as String)
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
-      final json = _safeJsonParse(clean);
-      if (json == null) return null;
-      final recipe = Recipe.fromJson({
-        ...json,
-        'id': _generateId(),
-        'createdAt': DateTime.now().toIso8601String(),
-      });
-      recipe.imageUrl = await getDishImageUrl(recipe.nameEn ?? recipe.title);
-      return recipe;
+      return await _callRecipeAPI(ingredients);
     } catch (e) {
-      debugPrint('generateRecipeFromText error: $e');
-      return null;
+      debugPrint('Recipe API failed, retrying: $e');
+      await Future.delayed(const Duration(milliseconds: 1500));
+      return await _callRecipeAPI(ingredients);
     }
   }
 
-  Future<Map<String, List<Recipe>>> generateMealPlan({
-    String? dietType,
-    int? caloriesPerDay,
-  }) async {
-    try {
-      final prompt = '''
-Create a 7-day meal plan with REAL authentic dish names.
-${dietType != null ? 'Diet: $dietType' : ''}
-${caloriesPerDay != null ? 'Calories/day: $caloriesPerDay' : ''}
-Return ONLY valid JSON object with day names as keys and arrays of recipe objects as values.
-''';
-      final result = await _request(
-        model: _chatModel,
-        messages: [{'role': 'user', 'content': prompt}],
-        jsonMode: true,
-      );
-      final clean = (result['content'] as String)
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
-      final Map<String, dynamic>? json = _safeJsonParse(clean);
-      if (json == null) return {};
-      return json.map((day, recipes) => MapEntry(
-            day,
-            (recipes as List)
-                .map((r) => Recipe.fromJson({
-                      ...r,
-                      'id': _generateId(),
-                      'createdAt': DateTime.now().toIso8601String(),
-                    }))
-                .toList(),
-          ));
-    } catch (e) {
-      debugPrint('generateMealPlan error: $e');
-      return {};
+  Future<List<Recipe>> _callRecipeAPI(List<String> ingredients) async {
+    final ingredientsStr = ingredients.join(', ');
+
+    final systemPrompt = '''You are a world-renowned culinary expert. Your job is to suggest REAL traditional dishes that actually use the scanned ingredients.
+
+═══════════════════════════════════════
+INGREDIENT → DISH MATCHING RULES (STRICT)
+═══════════════════════════════════════
+
+NOODLES / PASTA:
+• "long thin noodles" / "spaghetti" / "egg noodles" → ONLY: Lagman (Uzbek), Spaghetti Carbonara (Italian), Pasta Bolognese (Italian), Ramen (Japanese), Pad Thai (Thai), Lo Mein (Chinese)
+• "rice noodles" / "flat rice noodles" → ONLY: Pad Thai (Thai), Pho (Vietnamese), Bun Bo Hue (Vietnamese)
+• "pasta sheets" / "lasagna sheets" / "wide flat pasta" → ONLY: Lasagna (Italian), Pastitsio (Greek)
+• "short pasta" / "penne" / "rigatoni" → ONLY: Pasta al Forno (Italian), Pastitsio (Greek)
+• FORBIDDEN with any noodles: Dimlama, Shurpa/Shorpa, Beshbarmak, Guacamole, Ceviche
+
+MEAT:
+• "ground beef" / "minced beef" → Pasta Bolognese, Köfte, Moussaka, Cheeseburger, Tacos
+• "beef chunks" / "beef stew" → Plov (if with rice+carrot), Dimlama, Boeuf Bourguignon, Beef Stroganoff
+• "lamb chunks" → Plov, Shurpa, Lagman (only if noodles present), Mansaf, Coq au Vin
+• "pork belly" / "bacon" → Ramen, Churrasco, Feijoada, Coq au Vin
+• "chicken" → Butter Chicken, Biryani, Coq au Vin, Teriyaki, Shawarma, Roast Chicken
+
+RICE:
+• "rice" + "lamb/beef" + "carrot" → Plov (Uzbek) — BEST MATCH
+• "rice" + "chicken" + "spices" → Biryani (Indian), Kabsa (Arabic)
+• "rice" + "vegetables" → Fried Rice (Chinese), Risotto (Italian)
+
+EGGS:
+• "eggs" + "pasta" → Spaghetti Carbonara (Italian), Pasta al Forno
+• "eggs" + "vegetables" → Shakshuka (Arabic/Israeli), Frittata (Italian), Omelette
+• "eggs" alone → Omelette, Shakshuka, Eggs Benedict
+
+VEGETABLES:
+• "tomato" + "eggplant" + "zucchini" → Ratatouille (French), Imam Bayildi (Turkish)
+• "spinach" + "cheese/paneer" → Palak Paneer (Indian), Spanakopita (Greek)
+• "chickpeas" → Hummus (Lebanese), Chana Masala (Indian), Falafel (Lebanese)
+• "potatoes" + "meat" → Dimlama (Uzbek), Massaman Curry (Thai), Shepherd's Pie
+
+═══════════════════════════════════════
+ABSOLUTE RULES
+═══════════════════════════════════════
+1. ONLY suggest dishes where the scanned ingredients are ACTUALLY used in the traditional recipe
+2. NEVER invent dishes — only real dishes with real names
+3. Each dish MUST have at least 7 detailed cooking steps
+4. Steps must be PRACTICAL and DETAILED (not "cook the meat" but "Heat oil in a heavy pan over high heat until smoking. Add lamb chunks — they should sizzle loudly. Brown on all sides for 10 minutes without stirring to form a crust.")
+5. Salt, oil, water, garlic, basic spices are assumed always available
+6. Reply ONLY with valid JSON array — no text outside JSON, no markdown''';
+
+    final userPrompt = '''Scanned ingredients: $ingredientsStr
+
+Find 4-5 REAL traditional dishes from DIFFERENT world cuisines that genuinely use these exact ingredients.
+
+IMPORTANT MATCHING CHECK:
+- If ingredients include "long thin noodles" or "spaghetti" → suggest Lagman, Spaghetti Carbonara, Ramen, Pad Thai (NOT lasagna, NOT ravioli)
+- If ingredients include "rice" + "carrot" + "meat" → suggest Plov first
+- If ingredients include "eggplant" → suggest Imam Bayildi, Moussaka, Ratatouille
+- Always verify each dish actually uses the scanned ingredients before suggesting it
+
+Reply ONLY with this JSON:
+[
+  {
+    "title": "Dish Name in English",
+    "cuisine": "Italian",
+    "description": "Authentic description: what this dish is, where it is from, when it is eaten (2-3 sentences)",
+    "difficulty": "Easy",
+    "prepTime": 15,
+    "cookTime": 45,
+    "servings": 4,
+    "tags": ["pasta", "italian", "traditional"],
+    "ingredients": [
+      "400g spaghetti",
+      "200g guanciale or pancetta, diced",
+      "4 egg yolks",
+      "100g Pecorino Romano, grated",
+      "Black pepper, salt"
+    ],
+    "steps": [
+      {
+        "stepNumber": 1,
+        "instruction": "Bring a large pot of water to boil. Add 1 tablespoon of salt — the water should taste like the sea. This is the only chance to season the pasta itself.",
+        "timerSeconds": null,
+        "tip": "Use at least 4 liters of water for 400g pasta."
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Detailed step...",
+        "timerSeconds": 300,
+        "tip": "Chef tip here"
+      }
+    ],
+    "nutrition": {
+      "calories": 620,
+      "protein": 28,
+      "carbs": 72,
+      "fat": 22
     }
   }
+]''';
 
-  Future<String> chat(String message) async {
-    try {
-      _chatHistory.add({'role': 'user', 'content': message});
-      final result = await _request(
-        model: _chatModel,
-        messages: _chatHistory,
-        maxTokens: 1024,
-        temperature: 0.7, // для чата можно чуть выше
-      );
-      final content = result['content'] as String;
-      _chatHistory.add({'role': 'assistant', 'content': content});
-      return content;
-    } catch (e) {
-      _chatHistory.removeLast();
-      debugPrint('Chat failed: $e');
-      rethrow;
+    final response = await http
+        .post(
+          Uri.parse(_baseUrl),
+          headers: {
+            'Authorization': 'Bearer $_apiKey',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'model': 'llama-3.3-70b-versatile',
+            'temperature': 0.1,
+            'max_tokens': 6000,
+            'messages': [
+              {'role': 'system', 'content': systemPrompt},
+              {'role': 'user', 'content': userPrompt},
+            ],
+          }),
+        )
+        .timeout(const Duration(seconds: 60));
+
+    debugPrint('Recipe API status: ${response.statusCode}');
+
+    if (response.statusCode != 200) {
+      throw Exception('Recipe API error ${response.statusCode}: ${response.body}');
     }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final choices = data['choices'] as List?;
+    final first = choices != null && choices.isNotEmpty ? choices.first : null;
+    final content = (first is Map<String, dynamic>)
+        ? (first['message']?['content']?.toString().trim() ?? '')
+        : '';
+
+    debugPrint('Recipe response length: ${content.length}');
+
+    final cleaned = content.replaceAll('```json', '').replaceAll('```', '').trim();
+    final match = RegExp(r'\[[\s\S]*\]').firstMatch(cleaned);
+    if (match == null) throw Exception('No JSON array in response: $content');
+
+    final list = jsonDecode(match.group(0)!) as List;
+    final now = DateTime.now();
+    return list.asMap().entries.map((e) => _mapToRecipe(e.value, now, e.key)).toList();
   }
 
-  Future<Map<String, List<String>>> generateShoppingList(
-      List<Recipe> recipes) async {
-    try {
-      final allIngredients = recipes.expand((r) => r.ingredients).toList();
-      final prompt = '''
-Organize these ingredients into shopping categories.
-Return a JSON object with category names as keys and arrays of ingredient strings as values.
-Ingredients: ${allIngredients.join(', ')}
-Return ONLY valid JSON.
-''';
-      final result = await _request(
-        model: _chatModel,
-        messages: [{'role': 'user', 'content': prompt}],
-        jsonMode: true,
-      );
-      final clean = (result['content'] as String)
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
-      final Map<String, dynamic>? json = _safeJsonParse(clean);
-      if (json == null) return {};
-      return json.map((key, value) =>
-          MapEntry(key, List<String>.from(value)));
-    } catch (e) {
-      debugPrint('generateShoppingList error: $e');
-      return {};
-    }
-  }
+  // ─── MAPPING ──────────────────────────────────────────────────────────────
 
-  void resetChat() => _initChat();
+  Recipe _mapToRecipe(dynamic entry, DateTime createdAt, int index) {
+    final r = entry is Map<String, dynamic> ? entry : <String, dynamic>{};
+    final steps = (r['steps'] as List? ?? []).map((s) {
+      final step = s is Map<String, dynamic> ? s : <String, dynamic>{};
+      return RecipeStep(
+        stepNumber: step['stepNumber'] as int? ?? 0,
+        instruction: step['instruction']?.toString() ?? '',
+        timerSeconds: step['timerSeconds'] as int?,
+        tip: step['tip']?.toString(),
+      );
+    }).toList();
+
+    final n = r['nutrition'] is Map<String, dynamic> ? r['nutrition'] as Map<String, dynamic> : <String, dynamic>{};
+    return Recipe(
+      id: '${createdAt.millisecondsSinceEpoch}_$index',
+      title: r['title']?.toString() ?? '',
+      description: r['description']?.toString() ?? '',
+      ingredients: List<String>.from(r['ingredients'] ?? []),
+      steps: steps,
+      cookTime: r['cookTime'] as int? ?? 0,
+      prepTime: r['prepTime'] as int? ?? 0,
+      servings: r['servings'] as int? ?? 2,
+      difficulty: r['difficulty']?.toString() ?? 'Medium',
+      cuisine: r['cuisine']?.toString() ?? 'International',
+      imageUrl: '',
+      tags: List<String>.from(r['tags'] ?? []),
+      nutrition: NutritionInfo(
+        calories: n['calories'] as int? ?? 0,
+        protein: (n['protein'] ?? 0).toDouble(),
+        carbs: (n['carbs'] ?? 0).toDouble(),
+        fat: (n['fat'] ?? 0).toDouble(),
+        fiber: (n['fiber'] ?? 0).toDouble(),
+      ),
+      isFavorite: false,
+      createdAt: createdAt,
+    );
+  }
 }

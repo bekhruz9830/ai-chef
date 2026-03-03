@@ -6,6 +6,7 @@ import 'package:ai_chef/models/recipe.dart';
 import 'package:ai_chef/services/firebase_service.dart';
 import 'package:ai_chef/services/localization_service.dart';
 import 'package:ai_chef/screens/recipe_detail_screen.dart';
+import 'package:ai_chef/screens/home_screen.dart';
 
 class CompletionScreen extends StatefulWidget {
   final Recipe recipe;
@@ -74,7 +75,11 @@ class _CompletionScreenState extends State<CompletionScreen>
   }
 
   void _goBack() {
-    Navigator.popUntil(context, (route) => route.isFirst);
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
   }
 
   static const _confettiEmojis = ['🎉', '✨', '🍽️', '👨‍🍳', '⭐', '🌟', '💫', '🥳'];
@@ -157,7 +162,7 @@ class _CompletionScreenState extends State<CompletionScreen>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
-                      'Your meal is ready! Enjoy your delicious ${widget.recipe.title}!',
+                      loc.t('meal_ready_subtitle').replaceAll('%s', widget.recipe.title),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,

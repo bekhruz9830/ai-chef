@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:ai_chef/constants/theme.dart';
 import 'package:ai_chef/services/firebase_service.dart';
 import 'package:ai_chef/services/localization_service.dart';
@@ -11,6 +10,7 @@ import 'package:ai_chef/screens/appearance_screen.dart';
 import 'package:ai_chef/screens/info_screen.dart';
 import 'package:ai_chef/screens/notifications_screen.dart';
 import 'package:ai_chef/screens/share_screen.dart';
+import 'package:ai_chef/screens/review_screen.dart';
 
 const _avatarEmojiKey = 'user_avatar_emoji';
 
@@ -618,15 +618,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _openRateApp() async {
-    final uri = Uri.parse(
-      'https://play.google.com/store/apps/details?id=com.aichef.app',
-    );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
   Widget _buildSettings(LocalizationService loc) {
     final settings = [
       {'icon': Icons.palette_outlined, 'key': 'appearance', 'subkey': ''},
@@ -721,7 +712,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const ShareScreen()));
         break;
       case 'rate':
-        _openRateApp();
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ReviewScreen()));
         break;
       case 'about_app':
         Navigator.push(context, MaterialPageRoute(builder: (_) => const InfoScreen(type: InfoType.about)));

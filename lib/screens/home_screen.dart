@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _buildActionCard(
                   emoji: '📷',
                   title: 'Scan\nIngredients',
-                  subtitle: 'AI Recipe Magic',
+                  subtitle: 'Get recipes',
                   gradient: [AppColors.gradient1, AppColors.gradient2],
                   onTap: () => setState(() => _currentIndex = 1),
                 ),

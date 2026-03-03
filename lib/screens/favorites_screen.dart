@@ -36,9 +36,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Removed from favorites'),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: const Text('Removed'),
           action: SnackBarAction(
             label: 'Undo',
             onPressed: () async {
@@ -51,6 +51,37 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
   }
 
+  Future<void> _confirmDeleteAll() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete all?'),
+        content: const Text(
+          'This will remove all saved recipes. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete all'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await FirebaseService.deleteAllFavoriteRecipes();
+    if (mounted) {
+      setState(() {
+        _recipes = [];
+        _loading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -58,9 +89,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       appBar: AppBar(
         title: const Text('Saved Recipes'),
         actions: [
-          if (_recipes.isNotEmpty)
+          if (_recipes.isNotEmpty) ...[
             Padding(
-              padding: const EdgeInsets.only(right: 16),
+              padding: const EdgeInsets.only(right: 8),
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -78,6 +109,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
               ),
             ),
+            IconButton(
+              icon: const Icon(Icons.delete_sweep),
+              tooltip: 'Delete all',
+              onPressed: () => _confirmDeleteAll(),
+            ),
+          ],
         ],
       ),
       body: _loading

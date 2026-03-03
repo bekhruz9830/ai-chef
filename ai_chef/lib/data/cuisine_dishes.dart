@@ -41,9 +41,9 @@ const List<CuisineData> allCuisines = [
       CuisineDish(title: 'Шурпа',             nameEn: 'Shurpa soup'),
       CuisineDish(title: 'Манты',             nameEn: 'Manti dumplings'),
       CuisineDish(title: 'Самса',             nameEn: 'Samsa'),
-      CuisineDish(title: 'Дамлама',           nameEn: 'Dimlama'),
-      CuisineDish(title: 'Бешбармак',         nameEn: 'Beshbarmak'),
-      CuisineDish(title: 'Нарын',             nameEn: 'Naryn noodles'),
+      CuisineDish(title: 'Димляма',           nameEn: 'Dimlama'),
+      CuisineDish(title: 'Нарын',             nameEn: 'Naryn'),
+      // Бешбармак — казахское блюдо, не узбекское; в узбекском списке нет
       CuisineDish(title: 'Мастава',           nameEn: 'Mastava rice soup'),
       CuisineDish(title: 'Жареная картошка с мясом', nameEn: 'Uzbek fried potatoes meat'),
       CuisineDish(title: 'Кабоб',             nameEn: 'Kebab shashlik'),
@@ -79,6 +79,7 @@ const List<CuisineData> allCuisines = [
       CuisineDish(title: 'Солянка',           nameEn: 'Solyanka soup'),
       CuisineDish(title: 'Котлеты',          nameEn: 'Russian Kotlety'),
       CuisineDish(title: 'Окрошка',           nameEn: 'Okroshka'),
+      CuisineDish(title: 'Лапша по-флотски', nameEn: 'Russian navy noodles'),
     ],
   ),
 

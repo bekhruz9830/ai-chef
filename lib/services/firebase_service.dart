@@ -55,6 +55,7 @@ class FirebaseService {
 
     return snapshot.docs
         .map((doc) => Recipe.fromJson(doc.data()))
+        .where((r) => r.ingredients.isNotEmpty)
         .toList();
   }
 
@@ -71,6 +72,7 @@ class FirebaseService {
 
     return snapshot.docs
         .map((doc) => Recipe.fromJson(doc.data()))
+        .where((r) => r.ingredients.isNotEmpty)
         .toList();
   }
 
@@ -96,6 +98,25 @@ class FirebaseService {
         .collection('recipes')
         .doc(recipeId)
         .delete();
+  }
+
+  /// Removes all saved (favorite) recipes for the current user.
+  static Future<void> deleteAllFavoriteRecipes() async {
+    final userId = currentUser?.uid;
+    if (userId == null) return;
+
+    final snapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('recipes')
+        .where('isFavorite', isEqualTo: true)
+        .get();
+
+    final batch = _db.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
   }
 
   // Shopping list

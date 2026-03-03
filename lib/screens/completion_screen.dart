@@ -4,6 +4,7 @@ import 'package:ai_chef/constants/theme.dart';
 import 'package:ai_chef/models/recipe.dart';
 import 'package:ai_chef/services/firebase_service.dart';
 import 'package:ai_chef/screens/recipe_detail_screen.dart';
+import 'package:ai_chef/screens/home_screen.dart';
 
 class CompletionScreen extends StatefulWidget {
   final Recipe recipe;
@@ -71,10 +72,38 @@ class _CompletionScreenState extends State<CompletionScreen>
   }
 
   void _goBack() {
-    Navigator.popUntil(context, (route) => route.isFirst);
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
   }
 
   static const _confettiEmojis = ['🎉', '✨', '🍽️', '👨‍🍳', '⭐', '🌟', '💫', '🥳'];
+
+  static const _mealReadyTemplates = {
+    'ru': 'Ваше блюдо готово! Приятного аппетита: %s!',
+    'uz': 'Taomingiz tayyor! Mazza qiling: %s!',
+    'zh': '您的美食准备好了！请享用您美味的%s！',
+    'ja': '料理ができました！おいしい%sをお楽しみください！',
+    'ko': '요리가 완성되었습니다! 맛있는 %s 맛있게 드세요!',
+    'ar': 'وجبتك جاهزة! بالهناء والشفاء: %s!',
+    'de': 'Ihr Gericht ist fertig! Guten Appetit: %s!',
+    'fr': 'Votre plat est prêt! Bon appétit: %s!',
+    'es': '¡Tu plato está listo! Disfruta tu delicioso %s!',
+    'it': 'Il tuo piatto è pronto! Buon appetito: %s!',
+    'pt': 'Sua refeição está pronta! Bom apetite: %s!',
+    'tr': 'Yemeğiniz hazır! Afiyet olsun: %s!',
+    'hi': 'आपका भोजन तैयार है! अपने स्वादिष्ट %s का आनंद लें!',
+    'id': 'Hidangan Anda siap! Selamat menikmati %s yang lezat!',
+    'nl': 'Je maaltijd is klaar! Geniet van je heerlijke %s!',
+  };
+
+  String _mealReadyText(BuildContext context) {
+    final locale = Localizations.localeOf(context).languageCode;
+    final template = _mealReadyTemplates[locale] ?? 'Your meal is ready! Enjoy your delicious %s!';
+    return template.replaceAll('%s', widget.recipe.title);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +182,7 @@ class _CompletionScreenState extends State<CompletionScreen>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
-                      'Your meal is ready! Enjoy your delicious ${widget.recipe.title}!',
+                      _mealReadyText(context),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,

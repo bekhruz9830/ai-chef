@@ -86,19 +86,32 @@ class GeminiService {
     }
 
     final allowedRule = allowedDishNames != null && allowedDishNames.isNotEmpty
-        ? 'CRITICAL: You MUST suggest ONLY dishes from this exact list (use "title" exactly as in the list): ${allowedDishNames.join(", ")}. Do not invent any other dish name. Pick 4 dishes that best match the ingredients in the image.\n\n'
+        ? 'ALLOWED DISHES (you may suggest ONLY these, title exactly as written): ${allowedDishNames.join(", ")}.\n\n'
         : '';
 
-    final prompt = 'You are a professional chef. Look at the ingredients in the image. Generate 4 REAL traditional dishes from $cuisineStr cuisine. Each dish must be a dish that REALLY exists in that cuisine — no invented combinations, no fusion.\n\n'
-        '$allowedRule'
-        'FORBIDDEN — never do this:\n'
-        '- Do NOT add pasta, fettuccine, spaghetti, or noodles to dishes that do not traditionally contain them. Plov, Shurpa, Manti, Shashlik, Mastava, Solyanka, Borscht, Kebab, Dimlama are NOT pasta dishes. Wrong examples: "Manti with Fettuccine", "Shurpa with Fettuccine", "Shashlik with Spaghetti".\n'
-        '- Do NOT invent dish names. Only real traditional names (e.g. Plov, Manti, Shurpa, Lagman, Samsa, Borscht, Pelmeni — as they are cooked in real cuisine).\n\n'
-        'CRITICAL LANGUAGE RULE: Every textual field MUST be written ONLY in $langName: title, description, ingredients, steps, difficulty, cuisine, tags. '
-        'Ingredient names in $langName; numbers/units can stay as is.\n\n'
-        'For each dish provide: real traditional name, exact ingredients with weights in grams, steps with WHAT to do, HOW MUCH, temperature, HOW LONG, timerSeconds realistic.\n\n'
-        'Return ONLY valid JSON array, no markdown:\n'
-        '[{"title":"Dish name from allowed list or real cuisine","description":"...","ingredients":["..."],"steps":[{"stepNumber":1,"instruction":"...","timerSeconds":0}],"cookTime":25,"prepTime":10,"servings":2,"difficulty":"Easy","cuisine":"...","tags":["..."],"nutrition":{"calories":520,"protein":14,"carbs":72,"fat":20,"fiber":4}}]';
+    const strictFilterPrompt = '''
+STRICT FILTER — follow exactly:
+
+STEP 1 — Identify ingredients: Look at the image and list ONLY the main ingredients you see (e.g. beef, potatoes / OR noodles, pasta / OR avocado / OR chicken, rice / etc.). Do not add anything that is not clearly visible.
+
+STEP 2 — Match dishes to ingredients: From the allowed list above, choose ONLY dishes whose TRADITIONAL recipe actually uses those ingredients. If a dish does not traditionally contain the scanned ingredients, do NOT suggest it. CRITICAL: If the image shows CHICKEN, suggest only chicken dishes (e.g. Chicken Tikka, Coq au Vin). Do NOT suggest beef-only dishes like Beef Stroganoff. If the image shows BEEF/MEAT, do not suggest chicken-only dishes. The dish must contain the main ingredient visible in the image.
+
+EXAMPLES (apply the same logic for any scan):
+- Scanned BEEF + POTATOES → only dishes with meat and potatoes: Uzbek Plov, Dimlama, Uzbek fried potatoes meat, Beef Stroganoff. Do NOT suggest Lagman, navy noodles, Manti, Olivier (unless eggs/peas/mayo visible).
+- Scanned NOODLES / LAPSHA (лапша) → only dishes made with LONG NOODLES (spaghetti, strand pasta, Asian noodles): Spaghetti Carbonara, Pasta Bolognese (spaghetti), Lagman, Russian navy noodles, Pad Thai, Udon, Chow Mein, Ramen. Do NOT suggest Lasagna (flat pasta sheets, not лапша) or Ravioli (filled pasta pockets, not noodles). Do NOT suggest Manti, Dimlama, Shurpa, Plov.
+- Scanned AVOCADO → only dishes with avocado: Guacamole, avocado salad. Do NOT suggest dishes without avocado.
+- Scanned RICE → Plov, Risotto, Biryani. Do NOT suggest noodle dishes.
+
+STEP 3 — Recipe content: For each chosen dish, write the REAL traditional recipe. Ingredients and steps must match THAT dish exactly. Do not use generic or wrong steps (e.g. do not show "cook lasagna noodles" for a dish that is not lasagna). Each dish has its own correct method.
+
+FORBIDDEN: Invented dishes; Lasagna and Ravioli when user scanned noodles/лапша (they are not noodle dishes); wrong or mixed cooking steps; adding ingredients not in the image; Beshbarmak for Uzbek; same steps for every dish.
+''';
+
+    final prompt = 'You are a culinary expert. $allowedRule'
+        '$strictFilterPrompt'
+        'LANGUAGE: Write all text (title, description, ingredients, steps, tags) ONLY in $langName.\n\n'
+        'Return ONLY a valid JSON array of 4 DIFFERENT dishes (no duplicate titles), no markdown:\n'
+        '[{"title":"Exact name from allowed list","description":"Short description of the dish","ingredients":["ingredient with amount"],"steps":[{"stepNumber":1,"instruction":"...","timerSeconds":0}],"cookTime":30,"prepTime":15,"servings":2,"difficulty":"Easy","cuisine":"$cuisineStr","tags":["tag1","tag2"],"nutrition":{"calories":400,"protein":25,"carbs":35,"fat":15,"fiber":4}}]';
 
     final response = await http.post(
       Uri.parse(_url),
@@ -194,12 +207,15 @@ class GeminiService {
     }
 
     final recipes = <Recipe>[];
+    final seenTitles = <String>{};
     for (var i = 0; i < list.length; i++) {
       try {
         final item = list[i];
         if (item is! Map) continue;
         final map = Map<String, dynamic>.from(item);
         _normalizeRecipeMap(map);
+        final title = (map['title'] ?? '').toString().trim().toLowerCase();
+        if (title.isEmpty || !seenTitles.add(title)) continue;
         map['id'] = '${DateTime.now().millisecondsSinceEpoch}_$i';
         map['createdAt'] = DateTime.now().toIso8601String();
         recipes.add(Recipe.fromJson(map));

@@ -3,7 +3,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../constants/theme.dart';
 import '../models/recipe.dart';
-import '../services/gemini_service.dart';
+import '../services/groq_service.dart';
+import '../services/firebase_recipe_service.dart';
 import 'recipe_detail_screen.dart';
 
 class ScanScreen extends StatefulWidget {
@@ -14,12 +15,15 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  final _gemini = GeminiService();
+  final _groq = GroqService();
   bool _loading = false;
   List<Recipe> _recipes = [];
+  List<String> _lastIngredients = [];
   Uint8List? _imageBytes;
+  ImageSource _lastImageSource = ImageSource.gallery;
 
   Future<void> _pickImage(ImageSource source) async {
+    _lastImageSource = source;
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: source,
@@ -35,14 +39,32 @@ class _ScanScreenState extends State<ScanScreen> {
     });
 
     try {
-      final recipes = await _gemini.analyzeIngredientsFromImage(bytes);
-      setState(() => _recipes = recipes);
+      final ingredients = await _groq.recognizeIngredients(bytes);
+      if (ingredients.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No food detected. Try another photo.')));
+        return;
+      }
+      var recipes = await FirebaseRecipeService.findByIngredients(ingredients);
+      recipes = recipes.where((r) => r.ingredients.isNotEmpty).toList();
+      if (mounted) {
+        setState(() {
+          _recipes = recipes;
+          _lastIngredients = ingredients;
+        });
+        if (recipes.isEmpty) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No matching recipes found for these ingredients.')));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
             backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _pickImage(_lastImageSource),
+            ),
           ),
         );
       }
@@ -106,7 +128,7 @@ class _ScanScreenState extends State<ScanScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'AI will suggest recipes instantly',
+                  'Get matching recipes instantly',
                   style: AppTextStyles.caption.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -223,13 +245,13 @@ class _ScanScreenState extends State<ScanScreen> {
           ),
           const SizedBox(height: 20),
           const Text(
-            'CHEF AI is analyzing\nyour ingredients...',
+            'Recognizing ingredients...',
             style: AppTextStyles.subtitle,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'Finding the best recipes for you',
+            'Finding recipes',
             style: AppTextStyles.caption.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -349,6 +371,23 @@ class _ScanScreenState extends State<ScanScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (_getAlternativeProteinLine(recipe) != null) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getAlternativeProteinLine(recipe)!,
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -388,6 +427,26 @@ class _ScanScreenState extends State<ScanScreen> {
         ),
       ),
     );
+  }
+
+  /// If the user scanned one main protein but the recipe uses another, return a short alternative line.
+  String? _getAlternativeProteinLine(Recipe recipe) {
+    if (_lastIngredients.isEmpty) return null;
+    final lower = _lastIngredients.map((e) => e.toLowerCase()).toList();
+    final recipeText = '${recipe.title} ${recipe.ingredients.join(' ')}'.toLowerCase();
+    final hasChicken = lower.any((x) => x.contains('chicken'));
+    final hasBeef = lower.any((x) => x.contains('beef') || x.contains('meat'));
+    final hasLamb = lower.any((x) => x.contains('lamb'));
+    if (hasChicken && (recipeText.contains('beef') || recipeText.contains('lamb'))) {
+      return 'Chicken dish';
+    }
+    if (hasBeef && recipeText.contains('chicken')) {
+      return 'Try with beef instead of chicken';
+    }
+    if (hasLamb && recipeText.contains('chicken')) {
+      return 'Try with lamb instead of chicken';
+    }
+    return null;
   }
 
   String _getCuisineEmoji(String cuisine) {

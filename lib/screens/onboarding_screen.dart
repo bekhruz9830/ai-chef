@@ -23,7 +23,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
       mainEmoji: '📸',
       bg: ['🥦', '🥕', '🧅', '🍅', '🫑', '🥑'],
       title: 'Scan Your\nIngredients',
-      body: 'Point your camera at any food or fridge.\nAI instantly identifies every ingredient\nand creates dishes just for you.',
+      body: 'Point your camera at any food or fridge.\nWe identify ingredients and find matching recipes for you.',
       tag: 'SMART SCANNER',
     ),
     _OBData(

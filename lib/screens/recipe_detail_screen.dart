@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import '../constants/theme.dart';
 import '../models/recipe.dart';
 import '../services/firebase_service.dart';
@@ -17,23 +16,18 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   late TabController _tabController;
   late Recipe _recipe;
   int _servings = 2;
-  int _activeStep = -1;
-  Timer? _timer;
-  int _timerSeconds = 0;
-  bool _timerRunning = false;
 
   @override
   void initState() {
     super.initState();
     _recipe = widget.recipe;
     _servings = _recipe.servings;
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _timer?.cancel();
     super.dispose();
   }
 
@@ -41,47 +35,17 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
     final newValue = !_recipe.isFavorite;
     await FirebaseService.saveRecipe(_recipe.copyWith(isFavorite: newValue));
     setState(() => _recipe = _recipe.copyWith(isFavorite: newValue));
-    if (mounted) {
+    if (mounted && newValue) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(newValue ? '❤️ Saved to favorites!' : 'Removed from favorites'),
-          backgroundColor: newValue ? AppColors.success : AppColors.textSecondary,
+          content: const Text('❤️ Saved to favorites!'),
+          backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           duration: const Duration(seconds: 2),
         ),
       );
     }
-  }
-
-  void _startTimer(int seconds) {
-    _timer?.cancel();
-    setState(() {
-      _timerSeconds = seconds;
-      _timerRunning = true;
-    });
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timerSeconds <= 0) {
-        timer.cancel();
-        setState(() => _timerRunning = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('⏰ Timer done!'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      } else {
-        setState(() => _timerSeconds--);
-      }
-    });
-  }
-
-  String _formatTime(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -319,7 +283,6 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
         indicatorColor: AppColors.primary,
         tabs: const [
           Tab(text: 'Ingredients'),
-          Tab(text: 'Steps'),
           Tab(text: 'Tips'),
         ],
       ),
@@ -333,7 +296,6 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
         controller: _tabController,
         children: [
           _buildIngredients(),
-          _buildSteps(),
           _buildTips(),
         ],
       ),
@@ -341,8 +303,15 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
   }
 
   Widget _buildIngredients() {
+    if (_recipe.ingredients.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(AppSpacing.md),
+        child: Text('No ingredients listed.', style: AppTextStyles.caption),
+      );
+    }
     return ListView.builder(
       padding: const EdgeInsets.all(AppSpacing.md),
+      physics: const ClampingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       itemCount: _recipe.ingredients.length,
       itemBuilder: (context, index) {
         return Container(
@@ -377,115 +346,6 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
     );
   }
 
-  Widget _buildSteps() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      itemCount: _recipe.steps.length,
-      itemBuilder: (context, index) {
-        final step = _recipe.steps[index];
-        final isActive = _activeStep == index;
-        return GestureDetector(
-          onTap: () => setState(() => _activeStep = isActive ? -1 : index),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? AppColors.primary.withOpacity(0.05)
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isActive ? AppColors.primary : AppColors.border,
-                width: isActive ? 2 : 1,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: isActive ? AppColors.primary : AppColors.background,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${step.stepNumber}',
-                          style: TextStyle(
-                            color: isActive ? Colors.white : AppColors.textSecondary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        step.instruction,
-                        style: AppTextStyles.body,
-                      ),
-                    ),
-                  ],
-                ),
-                if (step.timerSeconds != null && isActive) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _startTimer(step.timerSeconds!),
-                          icon: const Icon(Icons.timer, size: 18),
-                          label: Text(
-                            _timerRunning
-                                ? '⏱ ${_formatTime(_timerSeconds)}'
-                                : 'Start ${_formatTime(step.timerSeconds!)} timer',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size(0, 40),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                if (step.tip != null) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Text('💡', style: TextStyle(fontSize: 14)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            step.tip!,
-                            style: AppTextStyles.caption.copyWith(
-                              color: Colors.amber.shade800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildTips() {
     final tips = [
       'Taste as you cook and adjust seasoning',
@@ -497,6 +357,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
 
     return ListView.builder(
       padding: const EdgeInsets.all(AppSpacing.md),
+      physics: const ClampingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       itemCount: tips.length,
       itemBuilder: (context, index) {
         return Container(
@@ -538,7 +399,6 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen>
         child: ElevatedButton(
           onPressed: () {
             _tabController.animateTo(1);
-            setState(() => _activeStep = 0);
           },
           child: const Text('Start Cooking 👨‍🍳'),
         ),

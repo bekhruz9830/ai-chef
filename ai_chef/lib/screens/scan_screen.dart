@@ -49,8 +49,9 @@ class _ScanScreenState extends State<ScanScreen> {
       _imageBytes = bytes;
       _recipes = [];
       _errorMessage = null;
-      _state = _ScanState.imageSelected;
+      _state = _ScanState.analyzing;
     });
+    await _runAnalysis();
   }
 
   Future<void> _runAnalysis() async {
@@ -60,7 +61,8 @@ class _ScanScreenState extends State<ScanScreen> {
       _state = _ScanState.analyzing;
     });
     try {
-      final recipes = await _gemini.analyzeIngredientsFromImage(_imageBytes!);
+      var recipes = await _gemini.analyzeIngredientsFromImage(_imageBytes!);
+      recipes = recipes.where((r) => r.ingredients.isNotEmpty).toList();
       if (!mounted) return;
       setState(() {
         _recipes = recipes;
@@ -73,14 +75,19 @@ class _ScanScreenState extends State<ScanScreen> {
           _state = _ScanState.imageSelected;
           _errorMessage = _isQuotaError(msg)
               ? 'API quota exceeded. Please wait a moment.'
-              : 'Could not analyze photo. Check connection and try again.';
+              : msg;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_errorMessage!),
+            content: Text(msg),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: Provider.of<LocalizationService>(context, listen: false).t('retry'),
+              textColor: Colors.white,
+              onPressed: () => _runAnalysis(),
+            ),
           ),
         );
       }
@@ -98,7 +105,8 @@ class _ScanScreenState extends State<ScanScreen> {
       _state = _ScanState.analyzing;
     });
     try {
-      final recipes = await _gemini.analyzeIngredientsFromImage(_imageBytes!, cuisine: cuisine);
+      var recipes = await _gemini.analyzeIngredientsFromImage(_imageBytes!, cuisine: cuisine);
+      recipes = recipes.where((r) => r.ingredients.isNotEmpty).toList();
       if (!mounted) return;
       setState(() {
         _recipes = recipes;
@@ -166,29 +174,6 @@ class _ScanScreenState extends State<ScanScreen> {
     final last = parts.last;
     if (last.length <= 1) return last.toUpperCase();
     return last[0].toUpperCase() + last.substring(1).toLowerCase();
-  }
-
-  NutritionInfo _getAverageNutrition() {
-    if (_recipes.isEmpty) {
-      return NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0);
-    }
-    final n = _recipes.length;
-    int calories = 0;
-    double protein = 0, carbs = 0, fat = 0, fiber = 0;
-    for (final r in _recipes) {
-      calories += r.nutrition.calories;
-      protein += r.nutrition.protein;
-      carbs += r.nutrition.carbs;
-      fat += r.nutrition.fat;
-      fiber += r.nutrition.fiber;
-    }
-    return NutritionInfo(
-      calories: (calories / n).round(),
-      protein: protein / n,
-      carbs: carbs / n,
-      fat: fat / n,
-      fiber: fiber / n,
-    );
   }
 
   @override
@@ -338,21 +323,6 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _runAnalysis,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: Text(loc.t('analyze')),
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -467,7 +437,6 @@ class _ScanScreenState extends State<ScanScreen> {
       if (name.isNotEmpty) nameSet.add(name);
     }
     final ingredientNames = nameSet.take(10).toList();
-    final nutrition = _getAverageNutrition();
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
@@ -499,52 +468,6 @@ class _ScanScreenState extends State<ScanScreen> {
             }).toList(),
           ),
           const SizedBox(height: 24),
-          Text(
-            '📊 Estimated nutrition (per serving)',
-            style: AppTextStyles.subtitle.copyWith(color: Theme.of(context).textTheme.bodyLarge?.color),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).dividerColor.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Text(
-                  '🔥 ${nutrition.calories} cal',
-                  style: AppTextStyles.caption.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                  ),
-                ),
-                Text(
-                  '💪 ${nutrition.protein.toStringAsFixed(0)}g',
-                  style: AppTextStyles.caption.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                  ),
-                ),
-                Text(
-                  '🌾 ${nutrition.carbs.toStringAsFixed(0)}g',
-                  style: AppTextStyles.caption.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                  ),
-                ),
-                Text(
-                  '🥑 ${nutrition.fat.toStringAsFixed(0)}g',
-                  style: AppTextStyles.caption.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -564,28 +487,20 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
+  /// Only cuisines we have in the database (Firebase).
   static const List<MapEntry<String, String>> _worldCuisines = [
+    MapEntry('🌍', 'International'),
     MapEntry('🇮🇹', 'Italian'),
-    MapEntry('🇯🇵', 'Japanese'),
-    MapEntry('🇲🇽', 'Mexican'),
-    MapEntry('🇮🇳', 'Indian'),
     MapEntry('🇫🇷', 'French'),
-    MapEntry('🇨🇳', 'Chinese'),
-    MapEntry('🇹🇷', 'Turkish'),
-    MapEntry('🇺🇿', 'Uzbek'),
+    MapEntry('🇲🇽', 'Mexican'),
+    MapEntry('🇺🇸', 'American'),
+    MapEntry('🇮🇳', 'Indian'),
     MapEntry('🇬🇷', 'Greek'),
+    MapEntry('🇨🇳', 'Chinese'),
+    MapEntry('🥗', 'Mediterranean'),
+    MapEntry('🇯🇵', 'Japanese'),
     MapEntry('🇹🇭', 'Thai'),
     MapEntry('🇪🇸', 'Spanish'),
-    MapEntry('🇲🇦', 'Moroccan'),
-    MapEntry('🇱🇧', 'Lebanese'),
-    MapEntry('🇰🇷', 'Korean'),
-    MapEntry('🇻🇳', 'Vietnamese'),
-    MapEntry('🇧🇷', 'Brazilian'),
-    MapEntry('🇵🇪', 'Peruvian'),
-    MapEntry('🇦🇪', 'Arabic'),
-    MapEntry('🇷🇺', 'Russian'),
-    MapEntry('🇺🇸', 'American'),
-    MapEntry('🌍', 'International'),
   ];
 
   Widget _buildCuisineSelection(LocalizationService loc) {
@@ -833,29 +748,18 @@ class _ScanScreenState extends State<ScanScreen> {
 
   String _getCuisineFlag(String cuisine) {
     const flags = {
+      'International': '🌍',
       'Italian': '🇮🇹',
-      'Japanese': '🇯🇵',
-      'Mexican': '🇲🇽',
-      'Indian': '🇮🇳',
       'French': '🇫🇷',
-      'Chinese': '🇨🇳',
-      'Turkish': '🇹🇷',
-      'Uzbek': '🇺🇿',
+      'Mexican': '🇲🇽',
+      'American': '🇺🇸',
+      'Indian': '🇮🇳',
       'Greek': '🇬🇷',
+      'Chinese': '🇨🇳',
+      'Mediterranean': '🥗',
+      'Japanese': '🇯🇵',
       'Thai': '🇹🇭',
       'Spanish': '🇪🇸',
-      'Moroccan': '🇲🇦',
-      'Lebanese': '🇱🇧',
-      'Korean': '🇰🇷',
-      'Vietnamese': '🇻🇳',
-      'Brazilian': '🇧🇷',
-      'Peruvian': '🇵🇪',
-      'Arabic': '🇦🇪',
-      'Russian': '🇷🇺',
-      'American': '🇺🇸',
-      'Asian': '🇯🇵',
-      'Middle Eastern': '🌍',
-      'International': '🌍',
     };
     return flags[cuisine] ?? '🌍';
   }

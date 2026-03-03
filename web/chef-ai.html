@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Chef AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0e0f13;--surface:#16181f;--card:#1c1f2a;--accent:#e8642c;--accent2:#f0a05a;--text:#f0ede8;--muted:#8a8fa8;--border:#2a2d3a}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;max-width:480px;margin:0 auto}
+.screen{display:none;min-height:100vh;flex-direction:column}.screen.active{display:flex}
+#homeScreen{background:radial-gradient(ellipse at 30% 20%,#1a1e2e 0%,var(--bg) 70%)}
+.home-header{padding:36px 20px 10px}
+.home-header h1{font-family:'Playfair Display',serif;font-size:30px}
+.home-header p{color:var(--muted);font-size:14px;margin-top:6px;line-height:1.5}
+.scan-presets{padding:16px 20px;display:flex;flex-direction:column;gap:14px;flex:1;overflow-y:auto}
+.preset-label{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:2px}
+.preset-card{background:var(--card);border-radius:20px;padding:18px;border:2px solid var(--border);cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.preset-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(232,100,44,.1),transparent 60%);opacity:0;transition:opacity .2s}
+.preset-card:hover{border-color:var(--accent);transform:translateY(-2px)}.preset-card:hover::before{opacity:1}
+.preset-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.preset-emoji{font-size:32px}.preset-name{font-size:17px;font-weight:600}.preset-desc{font-size:13px;color:var(--muted)}
+.preset-tags{display:flex;flex-wrap:wrap;gap:6px}
+.ptag{background:#2a2d3a;border-radius:20px;padding:4px 12px;font-size:13px}
+.ptag.hl{background:rgba(232,100,44,.2);color:var(--accent2)}
+.custom-card{background:var(--card);border-radius:20px;padding:18px;border:2px dashed var(--border)}
+.custom-title{font-size:15px;font-weight:600;margin-bottom:10px}
+.custom-row{display:flex;gap:8px}
+.custom-input{flex:1;background:#13151e;border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none}
+.custom-input:focus{border-color:var(--accent)}
+.add-btn{background:var(--accent);border:none;border-radius:12px;padding:10px 16px;color:#fff;font-size:20px;cursor:pointer}
+.custom-tags-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-height:10px}
+.ctag{background:rgba(232,100,44,.18);color:var(--accent2);border-radius:20px;padding:5px 12px;font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer}
+.go-btn{width:100%;background:var(--accent);border:none;border-radius:14px;padding:13px;color:#fff;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;margin-top:12px}
+.go-btn:disabled{opacity:.35;cursor:not-allowed}
+#cuisineScreen{background:radial-gradient(ellipse at 30% 20%,#1a1e2e 0%,var(--bg) 70%)}
+.scan-header{padding:20px 20px 0;display:flex;justify-content:space-between;align-items:center}
+.scan-header h1{font-size:22px;font-weight:600}
+.back-link{color:var(--accent);font-size:15px;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:500}
+.scanned-items{margin:14px 20px 10px;background:var(--surface);border-radius:16px;padding:14px;border:1px solid var(--border)}
+.scanned-label{font-size:12px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
+.ingredient-tags{display:flex;flex-wrap:wrap;gap:8px}
+.itag{background:#2a2d3a;border-radius:20px;padding:6px 14px;font-size:14px;display:flex;align-items:center;gap:6px}
+.itag .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.choose-title{padding:0 20px 4px;font-family:'Playfair Display',serif;font-size:24px}
+.choose-sub{padding:0 20px 14px;color:var(--muted);font-size:14px}
+.cuisine-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 20px 20px;overflow-y:auto}
+.cuisine-card{background:var(--card);border-radius:16px;padding:20px 14px;text-align:center;cursor:pointer;border:2px solid transparent;transition:all .2s}
+.cuisine-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.flag{font-size:36px;margin-bottom:8px;display:block}.cuisine-name{font-size:15px;font-weight:500}
+#loadingScreen{background:var(--bg);justify-content:center;align-items:center;gap:24px}
+.load-chef{font-size:70px;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+.load-title{font-family:'Playfair Display',serif;font-size:22px;text-align:center}
+.load-sub{color:var(--muted);font-size:13px;text-align:center;max-width:280px;line-height:1.6}
+.dots{display:flex;gap:6px}
+.dots span{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:bounce 1.2s ease-in-out infinite}
+.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+#recipesScreen{background:var(--bg)}
+.recipes-header{padding:20px 20px 12px;display:flex;align-items:center;gap:14px;position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--border)}
+.back-btn{background:var(--card);border:none;border-radius:12px;width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text);font-size:18px;flex-shrink:0}
+.recipes-title{font-family:'Playfair Display',serif;font-size:22px}.recipes-subtitle{font-size:13px;color:var(--muted);margin-top:2px}
+.ing-badge{margin:14px 20px;background:#1a1e2a;border:1px solid var(--border);border-radius:12px;padding:10px 14px}
+.ing-badge-label{font-size:12px;color:var(--muted);margin-bottom:6px}
+.ing-pills{display:flex;flex-wrap:wrap;gap:6px}
+.ing-pill{background:#2a2d3a;border-radius:20px;padding:4px 12px;font-size:13px}
+.recipe-list{padding:0 20px 30px;display:flex;flex-direction:column;gap:14px}
+.recipe-card{background:var(--card);border-radius:20px;overflow:hidden;border:1px solid var(--border);transition:transform .2s,border-color .2s}
+.recipe-card:hover{transform:translateY(-2px);border-color:var(--accent2)}
+.recipe-top{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 18px 8px}
+.recipe-emoji{font-size:40px}.recipe-meta{text-align:right}
+.recipe-time{font-size:13px;color:var(--accent2);font-weight:600}.recipe-diff{font-size:12px;color:var(--muted);margin-top:2px}
+.recipe-name{font-family:'Playfair Display',serif;font-size:20px;padding:0 18px 3px;line-height:1.2}
+.recipe-orig{font-size:13px;color:var(--accent2);padding:0 18px 6px;font-style:italic}
+.recipe-desc{font-size:13px;color:var(--muted);padding:0 18px 10px;line-height:1.5}
+.recipe-tags-row{display:flex;gap:6px;flex-wrap:wrap;padding:0 18px 14px}
+.rtag{background:#2a2d3a;border-radius:6px;padding:3px 10px;font-size:12px;color:var(--muted)}
+.expand-btn{width:100%;background:linear-gradient(90deg,#1a1e2a,#1c1f2a);border:none;border-top:1px solid var(--border);color:var(--accent);padding:12px;font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.expand-btn:hover{background:#1f2436}
+.expand-icon{transition:transform .3s;font-size:12px}.expanded .expand-icon{transform:rotate(180deg)}
+.recipe-detail{display:none;border-top:1px solid var(--border);padding:18px;background:#13151e}
+.recipe-detail.open{display:block}
+.detail-section{margin-bottom:16px}.detail-section:last-child{margin-bottom:0}
+.detail-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);font-weight:600;margin-bottom:10px}
+.ing-list{list-style:none}
+.ing-list li{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #1e2130;font-size:14px;line-height:1.4}
+.ing-list li:last-child{border-bottom:none}
+.ing-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:5px}
+.ing-amount{margin-left:auto;color:var(--muted);white-space:nowrap;padding-left:8px}
+.steps-list{list-style:none}
+.steps-list li{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #1e2130;font-size:14px;line-height:1.6}
+.steps-list li:last-child{border-bottom:none}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:2px}
+.error-box{margin:24px 20px;background:rgba(200,50,50,.1);border:1px solid rgba(200,50,50,.3);border-radius:16px;padding:24px;text-align:center}
+.error-box h3{color:#e05555;margin-bottom:8px}.error-box p{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:14px}
+.retry-btn{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 24px;color:var(--text);font-family:inherit;font-size:14px;cursor:pointer}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:10px 0 20px;z-index:100}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer}
+.nav-item.active{color:var(--accent)}.nav-icon{font-size:22px}
+.nav-item.active .nav-icon{background:rgba(232,100,44,.15);border-radius:12px;padding:6px 12px}
+.pb-nav{padding-bottom:80px}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="screen active" id="homeScreen">
+  <div class="home-header">
+    <h1>Chef AI 👨‍🍳</h1>
+    <p>Отсканируй ингредиенты — получи реальные традиционные рецепты через Groq AI</p>
+  </div>
+  <div class="scan-presets pb-nav">
+    <div class="preset-label">📷 Быстрые наборы</div>
+    <div class="preset-card" onclick="pickPreset(['говядина','картошка'])">
+      <div class="preset-top"><div class="preset-emoji">🥩🥔</div><div><div class="preset-name">Говядина + Картошка</div><div class="preset-desc">Сытные традиционные блюда разных народов</div></div></div>
+      <div class="preset-tags"><span class="ptag hl">🥩 Говядина</span><span class="ptag hl">🥔 Картошка</span></div>
+    </div>
+    <div class="preset-card" onclick="pickPreset(['лапша'])">
+      <div class="preset-top"><div class="preset-emoji">🍜</div><div><div class="preset-name">Только лапша</div><div class="preset-desc">Лагман, рамен, удон и другие</div></div></div>
+      <div class="preset-tags"><span class="ptag hl">🍜 Лапша</span></div>
+    </div>
+    <div class="preset-card" onclick="pickPreset(['лапша','курица'])">
+      <div class="preset-top"><div class="preset-emoji">🍜🍗</div><div><div class="preset-name">Лапша + Курица</div><div class="preset-desc">Лёгкие и насыщенные блюда с бульоном</div></div></div>
+      <div class="preset-tags"><span class="ptag hl">🍜 Лапша</span><span class="ptag hl">🍗 Курица</span></div>
+    </div>
+    <div class="preset-card" onclick="pickPreset(['рис','баранина'])">
+      <div class="preset-top"><div class="preset-emoji">🍚🐑</div><div><div class="preset-name">Рис + Баранина</div><div class="preset-desc">Плов, машкичири, биряни и другие</div></div></div>
+      <div class="preset-tags"><span class="ptag hl">🍚 Рис</span><span class="ptag hl">🐑 Баранина</span></div>
+    </div>
+    <div class="preset-card" onclick="pickPreset(['яйца','помидоры'])">
+      <div class="preset-top"><div class="preset-emoji">🥚🍅</div><div><div class="preset-name">Яйца + Помидоры</div><div class="preset-desc">Шакшука, менемен и другие</div></div></div>
+      <div class="preset-tags"><span class="ptag hl">🥚 Яйца</span><span class="ptag hl">🍅 Помидоры</span></div>
+    </div>
+    <div class="preset-card" onclick="pickPreset(['рыба'])">
+      <div class="preset-top"><div class="preset-emoji">🐟</div><div><div class="preset-name">Только рыба</div><div class="preset-desc">Рыбные блюда разных кухонь мира</div></div></div>
+      <div class="preset-tags"><span class="ptag hl">🐟 Рыба</span></div>
+    </div>
+    <div class="preset-label" style="margin-top:4px">✏️ Свои ингредиенты</div>
+    <div class="custom-card">
+      <div class="custom-title">Введи что есть дома</div>
+      <div class="custom-row">
+        <input class="custom-input" id="customInput" placeholder="Например: баклажан, фарш…" onkeydown="if(event.key==='Enter')addTag()">
+        <button class="add-btn" onclick="addTag()">+</button>
+      </div>
+      <div class="custom-tags-row" id="customTagsRow"></div>
+      <button class="go-btn" id="goBtn" onclick="goCustom()" disabled>Найти рецепты →</button>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item active"><span class="nav-icon">🏠</span>Home</div>
+    <div class="nav-item"><span class="nav-icon">📷</span>Scan</div>
+    <div class="nav-item"><span class="nav-icon">🤖</span>Chef AI</div>
+    <div class="nav-item"><span class="nav-icon">❤️</span>Saved</div>
+    <div class="nav-item"><span class="nav-icon">👤</span>Profile</div>
+  </div>
+</div>
+
+<!-- CUISINE -->
+<div class="screen" id="cuisineScreen">
+  <div class="scan-header"><h1>Выбор кухни</h1><button class="back-link" onclick="show('homeScreen')">← Назад</button></div>
+  <div class="scanned-items"><div class="scanned-label">📷 Ваши ингредиенты</div><div class="ingredient-tags" id="scannedTags"></div></div>
+  <div class="choose-title">Выбери кухню 🌍</div>
+  <div class="choose-sub">Мы найдём рецепты по вашим ингредиентам</div>
+  <div class="cuisine-grid pb-nav">
+    <div class="cuisine-card" onclick="startLoad('International','🌐')"><span class="flag">🌐</span><div class="cuisine-name">International</div></div>
+    <div class="cuisine-card" onclick="startLoad('Italian','🇮🇹')"><span class="flag">🇮🇹</span><div class="cuisine-name">Italian</div></div>
+    <div class="cuisine-card" onclick="startLoad('French','🇫🇷')"><span class="flag">🇫🇷</span><div class="cuisine-name">French</div></div>
+    <div class="cuisine-card" onclick="startLoad('Mexican','🇲🇽')"><span class="flag">🇲🇽</span><div class="cuisine-name">Mexican</div></div>
+    <div class="cuisine-card" onclick="startLoad('American','🇺🇸')"><span class="flag">🇺🇸</span><div class="cuisine-name">American</div></div>
+    <div class="cuisine-card" onclick="startLoad('Indian','🇮🇳')"><span class="flag">🇮🇳</span><div class="cuisine-name">Indian</div></div>
+    <div class="cuisine-card" onclick="startLoad('Greek','🇬🇷')"><span class="flag">🇬🇷</span><div class="cuisine-name">Greek</div></div>
+    <div class="cuisine-card" onclick="startLoad('Chinese','🇨🇳')"><span class="flag">🇨🇳</span><div class="cuisine-name">Chinese</div></div>
+    <div class="cuisine-card" onclick="startLoad('Mediterranean','🥗')"><span class="flag">🥗</span><div class="cuisine-name">Mediterranean</div></div>
+    <div class="cuisine-card" onclick="startLoad('Japanese','🇯🇵')"><span class="flag">🇯🇵</span><div class="cuisine-name">Japanese</div></div>
+    <div class="cuisine-card" onclick="startLoad('Thai','🇹🇭')"><span class="flag">🇹🇭</span><div class="cuisine-name">Thai</div></div>
+    <div class="cuisine-card" onclick="startLoad('Spanish','🇪🇸')"><span class="flag">🇪🇸</span><div class="cuisine-name">Spanish</div></div>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item" onclick="show('homeScreen')"><span class="nav-icon">🏠</span>Home</div>
+    <div class="nav-item active"><span class="nav-icon">📷</span>Scan</div>
+    <div class="nav-item"><span class="nav-icon">🤖</span>Chef AI</div>
+    <div class="nav-item"><span class="nav-icon">❤️</span>Saved</div>
+    <div class="nav-item"><span class="nav-icon">👤</span>Profile</div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="screen" id="loadingScreen">
+  <div class="load-chef">👨‍🍳</div>
+  <div class="load-title">Шеф ищет рецепты…</div>
+  <div class="load-sub" id="loadSub">Загружаем настоящие традиционные блюда</div>
+  <div class="dots"><span></span><span></span><span></span></div>
+</div>
+
+<!-- RECIPES -->
+<div class="screen" id="recipesScreen">
+  <div class="recipes-header">
+    <button class="back-btn" onclick="show('cuisineScreen')">←</button>
+    <div><div class="recipes-title" id="rTitle"></div><div class="recipes-subtitle" id="rSub"></div></div>
+    <span id="rFlag" style="font-size:28px;margin-left:auto"></span>
+  </div>
+  <div class="ing-badge">
+    <div class="ing-badge-label">Ваши ингредиенты</div>
+    <div class="ing-pills" id="rIngPills"></div>
+  </div>
+  <div class="recipe-list pb-nav" id="recipeList"></div>
+  <div class="bottom-nav">
+    <div class="nav-item" onclick="show('homeScreen')"><span class="nav-icon">🏠</span>Home</div>
+    <div class="nav-item active"><span class="nav-icon">📷</span>Scan</div>
+    <div class="nav-item"><span class="nav-icon">🤖</span>Chef AI</div>
+    <div class="nav-item"><span class="nav-icon">❤️</span>Saved</div>
+    <div class="nav-item"><span class="nav-icon">👤</span>Profile</div>
+  </div>
+</div>
+
+<script>
+// ╔══════════════════════════════════════╗
+// ║  Вставь свой GROQ API key сюда.     ║
+// ║  Получить: https://console.groq.com  ║
+const GROQ_API_KEY = 'gsk_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
+const GROQ_MODEL   = 'llama-3.3-70b-versatile';
+// ╚══════════════════════════════════════╝
+
+let currentIngredients = [];
+let currentCuisine = '';
+let currentFlag = '';
+const customList = [];
+
+function addTag() {
+  const inp = document.getElementById('customInput');
+  const val = inp.value.trim();
+  if (!val) return;
+  customList.push(val);
+  inp.value = '';
+  renderCustom();
+}
+function removeTag(i) { customList.splice(i,1); renderCustom(); }
+function renderCustom() {
+  document.getElementById('customTagsRow').innerHTML = customList.map((t,i)=>
+    '<div class="ctag" onclick="removeTag('+i+')">'+t+' <span style="opacity:.6">✕</span></div>'
+  ).join('');
+  document.getElementById('goBtn').disabled = customList.length === 0;
+}
+function goCustom() { if (customList.length) pickPreset([...customList]); }
+
+function pickPreset(ingredients) {
+  currentIngredients = ingredients;
+  document.getElementById('scannedTags').innerHTML = ingredients.map(function(t){
+    return '<div class="itag"><span class="dot"></span>'+t+'</div>';
+  }).join('');
+  show('cuisineScreen');
+}
+
+async function startLoad(cuisine, flag) {
+  currentCuisine = cuisine;
+  currentFlag    = flag;
+  document.getElementById('loadSub').textContent = cuisine + ' кухня · ' + currentIngredients.join(', ');
+  show('loadingScreen');
+  try {
+    const dishes = await fetchFromGroq(currentIngredients, cuisine);
+    renderRecipes(dishes, cuisine, flag);
+    show('recipesScreen');
+    window.scrollTo(0,0);
+  } catch(e) {
+    console.error(e);
+    document.getElementById('rTitle').textContent = cuisine + ' кухня';
+    document.getElementById('rFlag').textContent  = flag;
+    document.getElementById('rSub').textContent   = 'Ошибка загрузки';
+    document.getElementById('rIngPills').innerHTML = '';
+    document.getElementById('recipeList').innerHTML = '<div class="error-box">' +
+      '<h3>⚠️ Ошибка подключения</h3>' +
+      '<p>' + (e.message || 'Проверь GROQ_API_KEY в коде файла.') + '</p>' +
+      '<button class="retry-btn" onclick="startLoad(\'' + cuisine + '\',\'' + flag + '\')">Повторить</button></div>';
+    show('recipesScreen');
+  }
+}
+
+async function fetchFromGroq(ingredients, cuisine) {
+  const ingList = ingredients.join(', ');
+  const prompt = 'Ты кулинарный историк и профессиональный шеф-повар.\n\n' +
+    'Найди 3–4 РЕАЛЬНО СУЩЕСТВУЮЩИХ исторических традиционных блюда ' + cuisine + ' кухни, в которых используются или хорошо сочетаются ингредиенты: ' + ingList + '.\n\n' +
+    'ПРАВИЛА:\n' +
+    '1. Только подлинные блюда с настоящими названиями — никаких выдуманных.\n' +
+    '2. originalName — название на языке оригинала (узбекский, японский, арабский и т.д.).\n' +
+    '3. description — 2 предложения об истории и особенностях. Конкретно, без воды.\n' +
+    '4. ingredients — полный список с точными граммовками как в профессиональной рецептуре.\n' +
+    '5. steps — минимум 6 подробных шагов с температурами, временем и техниками.\n' +
+    '6. difficulty: "Лёгкое", "Среднее" или "Сложное".\n\n' +
+    'Ответь ТОЛЬКО валидным JSON без markdown:\n' +
+    '{"dishes":[{"name":"Название RU","originalName":"Original","emoji":"🍲","time":"1–2 ч","difficulty":"Среднее","description":"Описание.","tags":["тег1","тег2","тег3"],"ingredients":[{"name":"Ингредиент","amount":"500 г"}],"steps":["Шаг 1","Шаг 2"]}]}';
+
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY },
+    body: JSON.stringify({
+      model: GROQ_MODEL, temperature: 0.2, max_tokens: 4096,
+      messages: [
+        { role: 'system', content: 'Отвечай ТОЛЬКО валидным JSON. Никакого текста вне JSON.' },
+        { role: 'user', content: prompt }
+      ]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(function(){ return {}; });
+    throw new Error(err.error && err.error.message ? err.error.message : 'Groq API ошибка ' + resp.status);
+  }
+  const data = await resp.json();
+  let raw = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) ? data.choices[0].message.content : '';
+  raw = raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  var parsed;
+  try { parsed = JSON.parse(raw); }
+  catch(e) {
+    var m = raw.match(/\{[\s\S]*\}/);
+    if (m) parsed = JSON.parse(m[0]);
+    else throw new Error('Не удалось разобрать ответ Groq. Попробуй ещё раз.');
+  }
+  if (!parsed.dishes || !parsed.dishes.length) throw new Error('Groq вернул пустой список блюд');
+  return parsed.dishes;
+}
+
+function renderRecipes(dishes, cuisine, flag) {
+  document.getElementById('rTitle').textContent  = cuisine + ' кухня';
+  document.getElementById('rFlag').textContent   = flag;
+  document.getElementById('rSub').textContent    = 'с: ' + currentIngredients.join(', ');
+  document.getElementById('rIngPills').innerHTML = currentIngredients.map(function(t){ return '<div class="ing-pill">' + t + '</div>'; }).join('');
+  document.getElementById('recipeList').innerHTML = dishes.map(function(d, idx){
+    var orig = d.originalName ? '<div class="recipe-orig">' + d.originalName + '</div>' : '';
+    var desc = d.description ? '<div class="recipe-desc">' + d.description + '</div>' : '';
+    var tags = (d.tags || []).map(function(t){ return '<span class="rtag">' + t + '</span>'; }).join('');
+    var ings = (d.ingredients || []).map(function(i){ return '<li><span class="ing-dot"></span><span>' + i.name + '</span><span class="ing-amount">' + i.amount + '</span></li>'; }).join('');
+    var steps = (d.steps || []).map(function(s, n){ return '<li><div class="step-num">' + (n+1) + '</div><span>' + s + '</span></li>'; }).join('');
+    return '<div class="recipe-card" id="card-' + idx + '">' +
+      '<div class="recipe-top"><div class="recipe-emoji">' + (d.emoji || '🍽️') + '</div><div class="recipe-meta"><div class="recipe-time">⏱ ' + (d.time || '') + '</div><div class="recipe-diff">' + (d.difficulty || '') + '</div></div></div>' +
+      '<div class="recipe-name">' + d.name + '</div>' + orig + desc +
+      '<div class="recipe-tags-row">' + tags + '</div>' +
+      '<button class="expand-btn" onclick="toggle(' + idx + ')">Смотреть рецепт <span class="expand-icon">▼</span></button>' +
+      '<div class="recipe-detail" id="detail-' + idx + '">' +
+        '<div class="detail-section"><div class="detail-title">🛒 Ингредиенты</div><ul class="ing-list">' + ings + '</ul></div>' +
+        '<div class="detail-section"><div class="detail-title">👨‍🍳 Приготовление</div><ol class="steps-list">' + steps + '</ol></div>' +
+      '</div></div>';
+  }).join('');
+}
+
+function toggle(idx) {
+  var detail = document.getElementById('detail-' + idx);
+  var card   = document.getElementById('card-' + idx);
+  var isOpen = detail.classList.contains('open');
+  document.querySelectorAll('.recipe-detail').forEach(function(d){ d.classList.remove('open'); });
+  document.querySelectorAll('.recipe-card').forEach(function(c){ c.classList.remove('expanded'); });
+  if (!isOpen) { detail.classList.add('open'); card.classList.add('expanded'); }
+}
+function show(id) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+</script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:ai_chef/screens/review_screen.dart';
 import '../constants/theme.dart';
 import '../services/firebase_service.dart';
 import 'login_screen.dart';
@@ -186,8 +187,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildStylePreferences() {
     final preferences = [
-      'Quick meals', 'Healthy', 'Budget-friendly',
-      'Italian', 'Asian', 'Vegetarian',
+      'International', 'Italian', 'French', 'Mexican', 'American',
+      'Indian', 'Greek', 'Chinese', 'Mediterranean', 'Japanese', 'Thai', 'Spanish',
     ];
 
     return Container(
@@ -293,7 +294,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   size: 14,
                   color: AppColors.textLight,
                 ),
-                onTap: () {},
+                onTap: () {
+                  if (setting['title'] == 'Rate the app') {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReviewScreen()));
+                  }
+                },
               ),
               if (!isLast)
                 const Divider(height: 1, indent: 70),
